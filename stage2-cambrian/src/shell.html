@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Эволюция · Уровень 2: Кембрийский океан</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#04121c;color:#e6eef4;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+#cv{position:fixed;left:0;top:0;width:100vw;height:100vh;display:block;touch-action:none;cursor:crosshair}
+.panel{background:rgba(6,18,28,.78);border:1px solid rgba(160,220,255,.16);border-radius:10px;padding:8px 11px;backdrop-filter:blur(4px)}
+#hud{position:fixed;left:10px;top:10px;width:262px}
+#hud .t{font-weight:600;margin-bottom:4px}
+.bar{height:7px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;margin:2px 0 5px}
+.bar i{display:block;height:100%;width:0;transition:width .2s}
+.lbl{display:flex;justify-content:space-between;font-size:12px;color:#c0ccd8}
+button{background:#14283a;color:#e6eef4;border:1px solid #2c4a62;border-radius:7px;padding:5px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:#5a8ab0;background:#1a3448}
+button.on{background:#1f5a86;border-color:#4a8ac0}
+button:disabled{opacity:.4;cursor:default}
+#hudBtns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+#info{position:fixed;left:14px;bottom:14px;color:#cfe6f5;font-size:12px;text-shadow:0 0 4px #000}
+#hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);max-width:min(640px,70vw);text-align:center;font-size:13px}
+#toasts{position:fixed;left:50%;top:10px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(540px,62vw)}
+.toast{animation:fade 6.5s forwards;text-align:center}
+.toast b{color:#ffe08a}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
+#goal{position:fixed;right:10px;top:10px;width:260px;font-size:12px}
+#vert{position:fixed;right:12px;bottom:80px;display:flex;flex-direction:column;gap:8px}
+#vert button{width:58px;height:50px;border-radius:12px;font-size:12px}
+.modal{position:fixed;inset:0;background:rgba(2,8,14,.84);display:flex;align-items:center;justify-content:center;z-index:20}
+.box{background:#0c1a26;border:1px solid #23415a;border-radius:14px;padding:20px 24px;max-width:min(1000px,96vw);max-height:94vh;overflow:auto}
+.box h1{margin:0 0 6px;font-size:26px;font-weight:600}
+.box h2{margin:0 0 8px;font-size:18px;font-weight:600}
+.muted{color:#93a8b8}.small{font-size:12px}
+.hidden{display:none!important}
+#editor .box{width:min(1200px,98vw);padding:14px 16px}
+.ecols{display:grid;grid-template-columns:320px 1fr 290px;gap:14px}
+.tree{max-height:72vh;overflow:auto;padding-right:4px}
+.grp{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#86a0b4;margin:10px 0 4px}
+.node{display:block;width:100%;text-align:left;margin:3px 0;padding:6px 9px;border-radius:8px}
+.node .n{font-weight:600}.node .c{float:right;color:#ffd47a}
+.node .d{font-size:11.5px;color:#a6b8c6;margin-top:2px;line-height:1.35}
+.node.owned{border-color:#3f7a60;background:#12291f}.node.owned .c{color:#7fd09f}
+.node.locked{opacity:.5}
+#ecv{width:100%;height:min(46vh,420px);background:#061722;border-radius:12px;display:block;cursor:pointer}
+.pal{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pal button{font-size:12px;padding:5px 6px;text-align:left}
+.stat{display:flex;justify-content:space-between;font-size:12px;padding:1px 0;border-bottom:1px solid #1b3142}
+#eInfo{min-height:36px;font-size:12px;color:#c6d6e2;margin-top:6px}
+.seginfo{background:#0f2333;border:1px solid #23415a;border-radius:10px;padding:8px;margin-top:8px}
+.prow{display:grid;grid-template-columns:1fr 70px 22px 22px 22px;gap:4px;align-items:center;font-size:12px;margin:3px 0}
+.prow button{padding:0;height:20px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.card{background:#12263a;border:1px solid #23415a;border-radius:12px;padding:12px;cursor:pointer}
+.card:hover{border-color:#5a9ad0}
+.card h3{margin:0 0 4px;font-size:16px}
+.meter{height:6px;border-radius:3px;background:#1d3346;overflow:hidden;margin:6px 0}
+.meter i{display:block;height:100%;background:#7fc0ff}
+input[type=range]{width:100%}
+@media (max-width:760px){#hud{width:200px;font-size:12px}#goal{display:none}.ecols{grid-template-columns:1fr}.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud" class="panel">
+ <div class="t" id="hTitle">Поколение 1</div>
+ <div class="lbl"><span>Здоровье</span><span id="hpTxt"></span></div><div class="bar"><i id="hpBar" style="background:#5fd07a"></i></div>
+ <div class="lbl"><span id="o2Lbl">Кислород</span><span id="o2Txt"></span></div><div class="bar"><i id="o2Bar" style="background:#6fd0ff"></i></div>
+ <div class="lbl"><span id="satLbl">Сытость</span><span></span></div><div class="bar"><i id="satBar" style="background:#7fa0ff"></i></div>
+ <div class="lbl"><span>Питательные вещества</span><span id="bmTxt" style="color:#e0b84a"></span></div>
+ <div class="lbl"><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span><span id="lenTxt"></span></div>
+ <div class="lbl"><span id="offTxt"></span><span id="packTxt"></span></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bEgg" class="hidden">Отложить яйца (R)</button><button id="bBur" class="hidden">Закопаться (B)</button><button id="bPack" class="hidden">Стая</button><button id="bFinal" class="hidden on">Завершить этап</button></div>
+</div>
+<div id="goal" class="panel"></div>
+<div id="info"></div>
+<div id="toasts"></div>
+<div id="hint" class="panel"></div>
+<div id="vert"><button id="bUp">↑ вверх</button><button id="bDown">↓ вниз</button></div>
+
+<div id="start" class="modal"><div class="box" style="max-width:640px">
+ <h1>Эволюция · Уровень 2</h1>
+ <div class="muted">Кембрийский океан, 520 миллионов лет назад. Жизнь только что «взорвалась» разнообразием: глаза, панцири, челюсти, первые хищники. Твоё многоклеточное стало крошечным червячком на дне. Расти, отращивай органы, размножайся и выбери, кем станут твои потомки: позвоночными, членистоногими или моллюсками.</div>
+ <div class="grp" style="margin-top:14px">Каким будет план тела?</div>
+ <div class="cards" style="grid-template-columns:1fr 1fr;margin-top:6px">
+  <div class="card on" data-sym="bilateral" id="symB"><h3>Двусторонняя симметрия</h3><div class="small muted">Червячок из сегментов: голова, хвост, левая и правая сторона. Линия человека — путь к позвоночным, членистоногим и моллюскам.</div></div>
+  <div class="card" data-sym="radial" id="symR"><h3>Радиальная симметрия</h3><div class="small muted">Медуза: колокол и щупальца по кругу. Красивая, но эволюционный тупик — путь книдарий.</div></div>
+ </div>
+ <div class="small muted" style="margin-top:10px">Управление: мышь — плыть за курсором (по горизонтали), WASD — тоже; Пробел — вверх, Shift — вниз. E — эволюция, R — отложить яйца рядом с партнёром, B — закопаться, P — пауза.</div>
+ <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="on" id="bNew" style="padding:9px 18px;font-size:15px">Новая игра</button><button id="bCont" class="hidden" style="padding:9px 18px;font-size:15px">Продолжить</button></div>
+ <div class="small muted" id="lvl1info" style="margin-top:8px"></div>
+</div></div>
+
+<div id="editor" class="modal hidden"><div class="box">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+  <h2 style="margin:0">Эволюция</h2>
+  <div class="small">Питательные вещества: <b id="eBm" style="color:#e0b84a"></b> · ДНК: <b id="eDna" style="color:#ffd47a"></b></div>
+  <button id="eClose" class="on">Готово (E)</button>
+ </div>
+ <div class="ecols">
+  <div class="tree" id="tree"></div>
+  <div><canvas id="ecv"></canvas><div id="eInfo"></div><div id="segBox" class="seginfo"></div></div>
+  <div>
+   <div class="grp" style="margin-top:0">Добавить часть на выбранный сегмент</div>
+   <div class="pal" id="pal"></div>
+   <div class="grp">Скелет</div>
+   <div class="pal" id="skel"></div>
+   <div class="grp">Окраска</div>
+   <input type="range" id="hue" min="0" max="359">
+   <div class="grp">Тело</div>
+   <div id="stats"></div>
+  </div>
+ </div>
+</div></div>
+<div id="final" class="modal hidden"><div class="box" style="max-width:900px" id="finalBox"></div></div>
+<div id="pause" class="modal hidden"><div class="box" style="max-width:360px;text-align:center"><h2>Пауза</h2><button class="on" id="bResume">Продолжить</button></div></div>
+<div id="mutm" class="modal hidden"><div class="box" style="max-width:480px" id="mutBox"></div></div>
+<script>
+/*GAME*/
+</script>
+</body>
+</html>

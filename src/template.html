@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Эволюция — прототип</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b0d12;color:#dfe3ea;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{display:flex;height:100vh}
+#view{flex:1;position:relative;min-width:0}
+#cv{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+#cv.drag{cursor:grabbing}
+#hud{position:absolute;left:10px;top:8px;background:rgba(10,12,18,.78);border:1px solid #2a2f3a;border-radius:8px;padding:6px 10px;pointer-events:none;max-width:70%}
+#hud b{color:#fff;font-weight:600}
+#hint{position:absolute;left:10px;bottom:8px;color:#8a92a3;font-size:11px;background:rgba(10,12,18,.6);padding:3px 8px;border-radius:6px;pointer-events:none}
+#toasts{position:absolute;right:10px;top:8px;display:flex;flex-direction:column;gap:6px;max-width:360px;pointer-events:none}
+.toast{background:rgba(20,24,33,.95);border:1px solid #3a4150;border-left:3px solid #e0b040;border-radius:6px;padding:7px 10px;font-size:12px;animation:fade 7s forwards}
+.toast.good{border-left-color:#5fbf6a}.toast.bad{border-left-color:#e05555}.toast.epoch{border-left-color:#5aa0e0}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
+#side{width:380px;flex:none;background:#141720;border-left:1px solid #252a35;overflow-y:auto;padding:10px 12px 40px}
+h3{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#8f98aa;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+h3:first-child{margin-top:2px}
+button{background:#232836;color:#dfe3ea;border:1px solid #343b4b;border-radius:6px;padding:4px 9px;font:inherit;cursor:pointer}
+button:hover{border-color:#566079;background:#2a3041}
+button.on{background:#2f5a9a;border-color:#4a7dc8;color:#fff}
+button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.card{background:#1a1e29;border:1px solid #262c39;border-radius:8px;padding:8px 10px}
+.muted{color:#8a92a3}.small{font-size:11px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;flex:none}
+table{width:100%;border-collapse:collapse}
+td{padding:2px 3px;white-space:nowrap}
+tr.sp{cursor:pointer}tr.sp:hover td{background:#212634}
+tr.sel td{background:#26314a}
+.genes{display:grid;grid-template-columns:1fr 82px 22px 22px;gap:2px 5px;align-items:center}
+.genes .grp{grid-column:1/-1;color:#7d879b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+.genes button{padding:0;height:20px;line-height:18px}
+.bar{height:7px;background:#262c3a;border-radius:4px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;background:#5a8fd8}
+.warn{color:#e0a040;font-size:10px}
+.mods{display:grid;grid-template-columns:1fr auto;gap:3px 6px;align-items:center;margin-top:6px}
+.mods button{padding:1px 6px;font-size:11px}
+.chip{display:inline-block;background:#26314a;border:1px solid #344566;border-radius:10px;padding:0 7px;margin:2px 3px 0 0;font-size:11px}
+#log{max-height:260px;overflow-y:auto;font-size:12px}
+#log div{padding:3px 0;border-bottom:1px solid #1f2430}
+#log .d{color:#6d7689;margin-right:4px}
+.t-mine{color:#9fe0a8}.t-mineBad{color:#ff8a8a}.t-cat{color:#f0c060}.t-epoch{color:#8cc0ff}.t-win{color:#ffe070}.t-war{color:#ff9f6a}.t-warAI{color:#c9a58f}.t-ext{color:#9aa1ad}.t-spec{color:#c8cfdc}.t-good{color:#9fe0a8}.t-mut{color:#c6a6ff}
+canvas.pnl{width:100%;background:#10131a;border:1px solid #252a35;border-radius:6px;display:block}
+#overlay,#over2{position:fixed;inset:0;background:rgba(5,7,10,.82);display:flex;align-items:center;justify-content:center;z-index:10}
+.modal{background:#161a24;border:1px solid #2c3242;border-radius:12px;padding:22px 26px;width:min(520px,92vw)}
+.modal h1{margin:0 0 4px;font-size:24px;font-weight:600}
+.modal label{display:block;margin:12px 0 4px;color:#a9b1c1}
+.modal input[type=number]{background:#0f1218;border:1px solid #2f3646;color:#fff;border-radius:6px;padding:5px 8px;width:140px;font:inherit}
+.modal input[type=range]{width:100%}
+.big{padding:8px 18px;font-size:14px}
+.hidden{display:none!important}
+@media (max-width:800px){#app{flex-direction:column}#side{width:100%;height:45vh;border-left:0;border-top:1px solid #252a35}#view{height:55vh;flex:none}}
+</style>
+</head>
+<body>
+<div id="app">
+ <div id="view">
+  <canvas id="cv"></canvas>
+  <div id="hud"></div>
+  <div id="toasts"></div>
+  <div id="hint">Колесо — масштаб · перетаскивание — сдвиг · клик — выбрать существо · Пробел — пауза · 1–6 — скорость</div>
+ </div>
+ <aside id="side">
+  <h3>Время <span id="simspeed" class="muted small"></span></h3>
+  <div class="row" id="speeds">
+   <button data-s="0">⏸</button><button data-s="1">×1</button><button data-s="3">×3</button><button data-s="10">×10</button><button data-s="30">×30</button><button data-s="100">Макс</button>
+  </div>
+
+  <h3>Моя линия <span id="ep" class="muted"></span></h3>
+  <div class="card" id="mine"></div>
+
+  <h3>Виды</h3>
+  <div class="card"><table id="splist"></table></div>
+
+  <h3>Численность <span class="muted small">белая — твоя линия</span></h3>
+  <canvas id="graph" class="pnl" height="150"></canvas>
+
+  <h3>Древо эволюции <span class="muted small">клик — выбрать вид</span></h3>
+  <canvas id="tree" class="pnl" height="200"></canvas>
+
+  <h3>Летопись</h3>
+  <div class="card" id="log"></div>
+
+  <h3>Существо</h3>
+  <div class="card" id="insp"><span class="muted">Кликни по существу на карте.</span></div>
+
+  <h3>Мир</h3>
+  <div class="row">
+   <button id="bSave">Сохранить</button><button id="bLoad">Загрузить</button><button id="bDown">Копировать сохранение</button><button id="bUp">Открыть файл</button><button id="bNew">Новый мир</button>
+   <input type="file" id="fileIn" accept=".json,application/json" class="hidden">
+  </div>
+  <div class="small muted" id="worldinfo" style="margin-top:6px"></div>
+ </aside>
+</div>
+
+<div id="overlay">
+ <div class="modal">
+  <h1>Эволюция</h1>
+  <div class="muted">Сотни и тысячи существ рождаются, мутируют, делятся на виды и воюют за место под солнцем. Веди свою эволюционную линию: она должна выжить и стать сильнее всех.</div>
+  <label>Каким начнёт твой вид?</label>
+  <div class="row" id="dietPick">
+   <button data-d="0.12" class="on">Травоядный</button><button data-d="0.48">Всеядный</button><button data-d="0.74">Хищник</button>
+  </div>
+  <label>Предел населения: <b id="capV">5300</b></label>
+  <input type="range" id="cap" min="1000" max="8000" step="100" value="5300">
+  <label>Видов-соперников (ИИ): <b id="aiV">7</b></label>
+  <input type="range" id="ai" min="3" max="11" step="1" value="7">
+  <label>Зерно мира (одно и то же зерно = та же карта)</label>
+  <input type="number" id="seed">
+  <div class="row" style="margin-top:18px">
+   <button class="big on" id="bStart">Сотворить мир</button>
+   <button class="big hidden" id="bCont">Продолжить сохранение</button>
+   <button class="big hidden" id="bClose">Отмена</button>
+  </div>
+ </div>
+</div>
+<div id="over2" class="hidden">
+ <div class="modal">
+  <h1 id="o2t"></h1>
+  <div class="muted" id="o2d"></div>
+  <div class="row" style="margin-top:18px"><button class="big" id="bWatch">Наблюдать дальше</button><button class="big on" id="bNew2">Новый мир</button></div>
+ </div>
+</div>
+<script>
+/*SIM*/
+</script>
+<script>
+/*UI*/
+</script>
+</body>
+</html>

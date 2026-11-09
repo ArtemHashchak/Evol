@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Эволюция — прототип</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b0d12;color:#dfe3ea;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{display:flex;height:100vh}
+#view{flex:1;position:relative;min-width:0}
+#cv{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+#cv.drag{cursor:grabbing}
+#hud{position:absolute;left:10px;top:8px;background:rgba(10,12,18,.78);border:1px solid #2a2f3a;border-radius:8px;padding:6px 10px;pointer-events:none;max-width:70%}
+#hud b{color:#fff;font-weight:600}
+#hint{position:absolute;left:10px;bottom:8px;color:#8a92a3;font-size:11px;background:rgba(10,12,18,.6);padding:3px 8px;border-radius:6px;pointer-events:none}
+#toasts{position:absolute;right:10px;top:8px;display:flex;flex-direction:column;gap:6px;max-width:360px;pointer-events:none}
+.toast{background:rgba(20,24,33,.95);border:1px solid #3a4150;border-left:3px solid #e0b040;border-radius:6px;padding:7px 10px;font-size:12px;animation:fade 7s forwards}
+.toast.good{border-left-color:#5fbf6a}.toast.bad{border-left-color:#e05555}.toast.epoch{border-left-color:#5aa0e0}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
+#side{width:380px;flex:none;background:#141720;border-left:1px solid #252a35;overflow-y:auto;padding:10px 12px 40px}
+h3{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#8f98aa;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+h3:first-child{margin-top:2px}
+button{background:#232836;color:#dfe3ea;border:1px solid #343b4b;border-radius:6px;padding:4px 9px;font:inherit;cursor:pointer}
+button:hover{border-color:#566079;background:#2a3041}
+button.on{background:#2f5a9a;border-color:#4a7dc8;color:#fff}
+button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.card{background:#1a1e29;border:1px solid #262c39;border-radius:8px;padding:8px 10px}
+.muted{color:#8a92a3}.small{font-size:11px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;flex:none}
+table{width:100%;border-collapse:collapse}
+td{padding:2px 3px;white-space:nowrap}
+tr.sp{cursor:pointer}tr.sp:hover td{background:#212634}
+tr.sel td{background:#26314a}
+.genes{display:grid;grid-template-columns:1fr 82px 22px 22px;gap:2px 5px;align-items:center}
+.genes .grp{grid-column:1/-1;color:#7d879b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+.genes button{padding:0;height:20px;line-height:18px}
+.bar{height:7px;background:#262c3a;border-radius:4px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;background:#5a8fd8}
+.warn{color:#e0a040;font-size:10px}
+.mods{display:grid;grid-template-columns:1fr auto;gap:3px 6px;align-items:center;margin-top:6px}
+.mods button{padding:1px 6px;font-size:11px}
+.chip{display:inline-block;background:#26314a;border:1px solid #344566;border-radius:10px;padding:0 7px;margin:2px 3px 0 0;font-size:11px}
+#log{max-height:260px;overflow-y:auto;font-size:12px}
+#log div{padding:3px 0;border-bottom:1px solid #1f2430}
+#log .d{color:#6d7689;margin-right:4px}
+.t-mine{color:#9fe0a8}.t-mineBad{color:#ff8a8a}.t-cat{color:#f0c060}.t-epoch{color:#8cc0ff}.t-win{color:#ffe070}.t-war{color:#ff9f6a}.t-warAI{color:#c9a58f}.t-ext{color:#9aa1ad}.t-spec{color:#c8cfdc}.t-good{color:#9fe0a8}.t-mut{color:#c6a6ff}
+canvas.pnl{width:100%;background:#10131a;border:1px solid #252a35;border-radius:6px;display:block}
+#overlay,#over2{position:fixed;inset:0;background:rgba(5,7,10,.82);display:flex;align-items:center;justify-content:center;z-index:10}
+.modal{background:#161a24;border:1px solid #2c3242;border-radius:12px;padding:22px 26px;width:min(520px,92vw)}
+.modal h1{margin:0 0 4px;font-size:24px;font-weight:600}
+.modal label{display:block;margin:12px 0 4px;color:#a9b1c1}
+.modal input[type=number]{background:#0f1218;border:1px solid #2f3646;color:#fff;border-radius:6px;padding:5px 8px;width:140px;font:inherit}
+.modal input[type=range]{width:100%}
+.big{padding:8px 18px;font-size:14px}
+.hidden{display:none!important}
+@media (max-width:800px){#app{flex-direction:column}#side{width:100%;height:45vh;border-left:0;border-top:1px solid #252a35}#view{height:55vh;flex:none}}
+</style>
+</head>
+<body>
+<div id="app">
+ <div id="view">
+  <canvas id="cv"></canvas>
+  <div id="hud"></div>
+  <div id="toasts"></div>
+  <div id="hint">Колесо — масштаб · перетаскивание — сдвиг · клик — выбрать существо · Пробел — пауза · 1–6 — скорость</div>
+ </div>
+ <aside id="side">
+  <h3>Время <span id="simspeed" class="muted small"></span></h3>
+  <div class="row" id="speeds">
+   <button data-s="0">⏸</button><button data-s="1">×1</button><button data-s="3">×3</button><button data-s="10">×10</button><button data-s="30">×30</button><button data-s="100">Макс</button>
+  </div>
+
+  <h3>Моя линия <span id="ep" class="muted"></span></h3>
+  <div class="card" id="mine"></div>
+
+  <h3>Виды</h3>
+  <div class="card"><table id="splist"></table></div>
+
+  <h3>Численность <span class="muted small">белая — твоя линия</span></h3>
+  <canvas id="graph" class="pnl" height="150"></canvas>
+
+  <h3>Древо эволюции <span class="muted small">клик — выбрать вид</span></h3>
+  <canvas id="tree" class="pnl" height="200"></canvas>
+
+  <h3>Летопись</h3>
+  <div class="card" id="log"></div>
+
+  <h3>Существо</h3>
+  <div class="card" id="insp"><span class="muted">Кликни по существу на карте.</span></div>
+
+  <h3>Мир</h3>
+  <div class="row">
+   <button id="bSave">Сохранить</button><button id="bLoad">Загрузить</button><button id="bDown">Копировать сохранение</button><button id="bUp">Открыть файл</button><button id="bNew">Новый мир</button>
+   <input type="file" id="fileIn" accept=".json,application/json" class="hidden">
+  </div>
+  <div class="small muted" id="worldinfo" style="margin-top:6px"></div>
+ </aside>
+</div>
+
+<div id="overlay">
+ <div class="modal">
+  <h1>Эволюция</h1>
+  <div class="muted">Сотни и тысячи существ рождаются, мутируют, делятся на виды и воюют за место под солнцем. Веди свою эволюционную линию: она должна выжить и стать сильнее всех.</div>
+  <label>Каким начнёт твой вид?</label>
+  <div class="row" id="dietPick">
+   <button data-d="0.12" class="on">Травоядный</button><button data-d="0.48">Всеядный</button><button data-d="0.74">Хищник</button>
+  </div>
+  <label>Предел населения: <b id="capV">5300</b></label>
+  <input type="range" id="cap" min="1000" max="8000" step="100" value="5300">
+  <label>Видов-соперников (ИИ): <b id="aiV">7</b></label>
+  <input type="range" id="ai" min="3" max="11" step="1" value="7">
+  <label>Зерно мира (одно и то же зерно = та же карта)</label>
+  <input type="number" id="seed">
+  <div class="row" style="margin-top:18px">
+   <button class="big on" id="bStart">Сотворить мир</button>
+   <button class="big hidden" id="bCont">Продолжить сохранение</button>
+   <button class="big hidden" id="bClose">Отмена</button>
+  </div>
+ </div>
+</div>
+<div id="over2" class="hidden">
+ <div class="modal">
+  <h1 id="o2t"></h1>
+  <div class="muted" id="o2d"></div>
+  <div class="row" style="margin-top:18px"><button class="big" id="bWatch">Наблюдать дальше</button><button class="big on" id="bNew2">Новый мир</button></div>
+ </div>
+</div>
+<script>
+const EVO=(function(){
+'use strict';
+const TILE=12, TW=200, TH=130, WW=TW*TILE, WH=TH*TILE;
+const DAY=240, SEASON_DAYS=8, YEAR_DAYS=32;
+const CELL=32, GW=Math.ceil(WW/CELL), GH=Math.ceil(WH/CELL);
+const DEEP=0,SHALLOW=1,BEACH=2,GRASS=3,FOREST=4,DESERT=5,TUNDRA=6,MOUNT=7,SNOW=8;
+const BIOME_NAMES=['Глубокая вода','Мелководье','Пляж','Степь','Лес','Пустыня','Тундра','Горы','Лёд и снег'];
+const PLANT_CAP=[1.0,2.6,0.8,6,9,0.8,2.2,1.4,0.15];
+const COVER=[0.3,0.4,0.15,0.45,1,0.25,0.35,0.75,0.2];
+const GN=['size','speed','sense','armor','attack','venom','camo','fert','diet','social','intel','topt','ttol','swim','fly','dig','life','hue','aggr','fear','rot','mut','night'];
+const NG=GN.length; const G={}; GN.forEach((n,i)=>G[n]=i);
+const GENE_RU={size:'Размер',speed:'Скорость',sense:'Зрение и чутьё',armor:'Броня',attack:'Атака (зубы, когти)',venom:'Сила яда',camo:'Маскировка',fert:'Плодовитость',diet:'Хищность',social:'Стайность',intel:'Интеллект',topt:'Любимая температура',ttol:'Терпимость к климату',swim:'Плавание',fly:'Полёт',dig:'Рытьё',life:'Долголетие',hue:'Окраска',aggr:'Агрессия',fear:'Осторожность',rot:'Падальщичество',mut:'Изменчивость',night:'Ночное зрение'};
+const MODS=[
+ {k:'fins',ru:'Плавники',cost:0.1,hint:'плавание работает в полную силу'},
+ {k:'wings',ru:'Крылья',cost:0.35,hint:'полёт над водой и горами (для небольших)'},
+ {k:'claws',ru:'Роющие когти',cost:0.1,hint:'норы: прятаться от хищников и метеоритов'},
+ {k:'shell',ru:'Панцирь',cost:0.2,hint:'броня работает в полную силу'},
+ {k:'venom',ru:'Ядовитая железа',cost:0.15,hint:'укусы отравляют'},
+ {k:'chroma',ru:'Хроматофоры',cost:0.1,hint:'маскировка работает в полную силу'},
+ {k:'eyes',ru:'Ночные глаза',cost:0.08,hint:'видит ночью'},
+ {k:'fur',ru:'Мех',cost:0.08,hint:'+10° к холодостойкости'},
+ {k:'scales',ru:'Термочешуя',cost:0.08,hint:'+9° к жаростойкости'},
+ {k:'horns',ru:'Рога',cost:0.1,hint:'+35% к атаке и отпору'},
+ {k:'brain',ru:'Большой мозг',cost:0.3,hint:'нейросеть-мозг влияет сильнее'},
+ {k:'voice',ru:'Сигнальный голос',cost:0.08,hint:'стая сражается слаженнее'},
+ {k:'stomach',ru:'Кислотный желудок',cost:0.05,hint:'можно есть тухлое мясо'}
+];
+const MB={}; MODS.forEach((m,i)=>MB[m.k]=1<<i);
+const NI=12,NH=6,NO=3,NW=NI*NH+NH*NO;
+const SPEC_T=0.32;
+const SPEC_GENES=[]; for(let i=0;i<NG;i++) if(i!==G.hue&&i!==G.mut) SPEC_GENES.push(i);
+const DX=[],DY=[]; for(let k=0;k<8;k++){DX.push(Math.cos(k*Math.PI/4));DY.push(Math.sin(k*Math.PI/4));}
+const R=Math.random;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+function gauss(){let u=0;while(u===0)u=R();return Math.sqrt(-2*Math.log(u))*Math.cos(6.2831853*R());}
+function pick(a){return a[(R()*a.length)|0];}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function makeNoise(rnd){const N=256,p=new Float32Array(N*N);for(let i=0;i<p.length;i++)p[i]=rnd();return function(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;const a=p[(yi&255)*N+(xi&255)],b=p[(yi&255)*N+((xi+1)&255)],c=p[((yi+1)&255)*N+(xi&255)],d=p[((yi+1)&255)*N+((xi+1)&255)];const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;};}
+function fbm(n,x,y,o){let s=0,a=0.5,f=1,t=0;for(let i=0;i<o;i++){s+=a*n(x*f,y*f);t+=a;a*=0.5;f*=2;}return s/t;}
+
+const S={};
+let cs=[];
+const head=new Int32Array(GW*GH); let nxt=new Int32Array(8192);
+const IN=new Float32Array(NI), HID=new Float32Array(NH);
+
+function tileIdx(x,y){let tx=(x/TILE)|0,ty=(y/TILE)|0;if(tx<0)tx=0;else if(tx>=TW)tx=TW-1;if(ty<0)ty=0;else if(ty>=TH)ty=TH-1;return ty*TW+tx;}
+function tempAt(x,y){const ti=tileIdx(x,y);return S.baseT[ti]+S.rowSeason[(ti/TW)|0]+S.climOff-S.dust+(S.light-0.5)*4;}
+
+function genWorld(seed){
+ const rnd=mulberry32(seed);const n1=makeNoise(rnd),n2=makeNoise(rnd);
+ S.elev=new Float32Array(TW*TH);S.moist=new Float32Array(TW*TH);S.baseT=new Float32Array(TW*TH);
+ const blobs=[];const nb=6+Math.floor(rnd()*4);
+ for(let i=0;i<nb;i++)blobs.push({x:TW*(0.1+rnd()*0.8),y:TH*(0.12+rnd()*0.76),r:13+rnd()*24});
+ for(let y=0;y<TH;y++)for(let x=0;x<TW;x++){
+  const i=y*TW+x;let b=0;
+  for(const bl of blobs){const d2=((x-bl.x)**2+(y-bl.y)**2)/(bl.r*bl.r);b=Math.max(b,Math.exp(-d2));}
+  const nn=fbm(n1,x/22,y/22,5);
+  let e=b*0.7+nn*0.7-0.62;
+  const edge=Math.min(x,y,TW-1-x,TH-1-y);if(edge<8)e-=(8-edge)*0.04;
+  S.elev[i]=e;S.moist[i]=fbm(n2,x/30+50,y/30,4);
+  const lat=Math.abs((y+0.5)/TH-0.5)*2;
+  S.baseT[i]=30-44*lat-Math.max(0,e)*35;
+ }
+}
+function classifyAll(){
+ const Bm=S.biome;
+ for(let i=0;i<TW*TH;i++){
+  const e=S.elev[i]-S.seaLevel,T=S.baseT[i]+S.climOff,m=S.moist[i];let b;
+  if(e<0){ if(T<-11) b=SNOW; else b=e<-0.1?DEEP:SHALLOW; }
+  else if(T<-6)b=SNOW;else if(e>0.36)b=MOUNT;else if(e<0.025)b=BEACH;else if(T<3)b=TUNDRA;else if(T>17&&m<0.43)b=DESERT;else if(m>0.53)b=FOREST;else b=GRASS;
+  Bm[i]=b;
+ }
+ S.classT=S.climOff;S.classSea=S.seaLevel;S.terrainDirty=true;
+}
+function computeSeason(){
+ const yf=(S.day%YEAR_DAYS)/YEAR_DAYS;S.yf=yf;
+ const s=Math.sin(2*Math.PI*(yf-0.125));
+ for(let y=0;y<TH;y++){const amp=(y+0.5)/TH*2-1;S.rowSeason[y]=-amp*11*s;}
+ S.seasonName=['весна','лето','осень','зима'][Math.floor(yf*4)];
+}
+function computeLight(){const ph=(S.tick%DAY)/DAY;S.light=clamp(0.5+0.65*Math.sin(2*Math.PI*(ph-0.25)),0,1);}
+
+function passable(c,ti){
+ const b=S.biome[ti];
+ if(c.flyE>0.3)return true;
+ if(b===DEEP)return c.swimE>0.45;
+ if(b===SHALLOW)return true;
+ return c.swimE<0.9;
+}
+function pheno(c){
+ const g=c.g,m=c.m;
+ c.size=0.6+g[0]*1.8;c.B=c.size*c.size;c.r=1.5+c.size*1.6;
+ c.armorE=g[3]*((m&MB.shell)?1:0.35);
+ c.atk=(0.1+g[4])*((m&MB.horns)?1.35:1);
+ c.venomE=(m&MB.venom)?g[5]:0;
+ c.camoE=g[6]*((m&MB.chroma)?1:0.35);
+ c.diet=g[8];c.social=g[9];
+ c.intelE=g[10]*((m&MB.brain)?1:0.4);
+ c.swimE=(m&MB.fins)?0.35+0.65*g[13]:0.3*g[13];
+ c.flyE=(m&MB.wings)?g[14]*clamp(2.3-c.size,0,1):0;
+ c.digE=(m&MB.claws)?g[15]:0;
+ c.nightE=(m&MB.eyes)?g[22]:0;
+ c.rotE=g[20]*((m&MB.stomach)?1:0.3);
+ c.aggr=g[18];c.fear=g[19];
+ const tOpt=-8+g[11]*42,tTol=3+g[12]*14;
+ c.tLo=tOpt-tTol-((m&MB.fur)?10:0);c.tHi=tOpt+tTol+((m&MB.scales)?9:0);
+ c.sense=20+g[2]*80;
+ c.maxSpd=(0.35+0.95*g[1])*(1.25-0.2*c.size)*(1-0.35*c.armorE)*(c.flyE>0.3?1.25:1);
+ c.maxE=50*c.B;c.maxHp=10*c.B*(1+c.armorE*1.5);
+ c.power=c.atk*c.size;c.def=c.armorE*c.size*1.2+0.05;
+ c.life=DAY*(6+g[16]*30);c.mature=DAY*1.2;
+ c.plantEff=clamp((1-c.diet)*1.4,0,1);c.meatEff=clamp(c.diet*1.45-0.08,0,1);
+ c.packMax=1+Math.floor(c.social*16);
+ let mc=0;for(let i=0;i<MODS.length;i++)if(m&(1<<i))mc+=MODS[i].cost;
+ c.meta=0.0065*Math.pow(c.B,0.8)*(1+0.5*g[2]+1.5*c.intelE+0.5*c.armorE+0.3*g[4]+0.3*c.venomE+0.2*c.camoE+0.25*g[16]+0.15*g[1]+mc+0.6*c.flyE);
+ c.litter=1+Math.floor(g[7]*3.99);
+}
+function newCreature(g,w,m,sp,x,y){
+ const c={id:S.nextId++,x,y,vx:0,vy:0,g,w,m,sp,age:0,gen:0,kills:0,cool:0,hidden:0,hideCool:0,poison:0,sick:0,imm:false,dead:false,
+  target:null,mate:null,threat:null,dx:0,dy:0,spdF:0.3,wa:R()*6.283,packB:1,kinN:0,stress:0,state:'',ti:0,nnAgg:0,cause:''};
+ pheno(c);c.energy=c.maxE*0.6;c.hp=c.maxHp;c.ti=tileIdx(x,y);c.age=(R()*c.mature)|0;return c;
+}
+function baseBrain(){
+ const w=new Float32Array(NW);
+ for(let i=0;i<NW;i++)w[i]=gauss()*0.15;
+ for(let j=0;j<6;j++)w[j*NI+3+j]+=1.5;
+ const o=NI*NH;
+ w[o+0]+=0.8;w[o+2]-=1.2;w[o+4]+=1.0;
+ w[o+NH+1]+=0.8;w[o+NH+3]-=1.2;w[o+NH+5]+=1.0;
+ return w;
+}
+function speciesGenome(diet,T){
+ const g=new Float32Array(NG);
+ g[G.size]=0.15+R()*0.2;g[G.speed]=diet>0.5?0.5+R()*0.15:0.3+R()*0.2;g[G.sense]=diet>0.5?0.5+R()*0.15:0.25+R()*0.15;g[G.armor]=0.1+R()*0.2;
+ g[G.attack]=diet>0.5?0.4+R()*0.15:0.1+R()*0.2;g[G.venom]=0.3+R()*0.3;g[G.camo]=0.2+R()*0.3;g[G.fert]=0.35+R()*0.3;
+ g[G.diet]=diet;g[G.social]=0.03+R()*0.1;g[G.intel]=0.15+R()*0.15;g[G.topt]=clamp((T+8)/42,0,1);g[G.ttol]=0.4+R()*0.2;
+ g[G.swim]=0.2+R()*0.2;g[G.fly]=0.2+R()*0.3;g[G.dig]=0.2+R()*0.3;g[G.life]=0.3+R()*0.2;g[G.hue]=R();g[G.aggr]=0.3+R()*0.2;
+ g[G.fear]=0.4+R()*0.2;g[G.rot]=0.2+R()*0.3;g[G.mut]=0.3+R()*0.2;g[G.night]=0.2+R()*0.3;
+ return g;
+}
+const ROOTS=['зав','лип','рон','тек','вар','мир','дрок','сал','гун','бер','ксил','тор','фан','лум','ска','вен','ор','кри','зен','мол','дар','пет','гал','рух','нок','бри','шен','квар'];
+function makeName(c){
+ const g=c.g,m=c.m,pre=[];
+ if(m&MB.wings)pre.push('Птеро');if((m&MB.fins)&&c.swimE>0.6)pre.push('Ихтио');if(m&MB.shell)pre.push('Панцеро');if(m&MB.venom)pre.push('Токси');
+ if(m&MB.horns)pre.push('Кера');if(m&MB.fur)pre.push('Мохно');if(m&MB.brain)pre.push('Мудро');if(m&MB.claws)pre.push('Норо');
+ if(g[G.size]>0.7)pre.push('Мега');if(g[G.size]<0.1)pre.push('Микро');if(g[G.speed]>0.75)pre.push('Тахи');if(g[G.social]>0.6)pre.push('Стае');
+ const suf=c.diet<0.3?['ник','ица','ус','ель','ка']:c.diet<0.6?['ид','он','аль','ит']:['дон','завр','кс','рог'];
+ let n=(pre.length&&R()<0.8?pick(pre):'')+pick(ROOTS)+(R()<0.5?pick(ROOTS):'')+pick(suf);
+ return n.charAt(0).toUpperCase()+n.slice(1);
+}
+const DESC={size:['крупнее','мельче'],speed:['быстрее','медленнее'],sense:['зорче','подслеповатее'],armor:['бронированнее','мягкотелее'],attack:['зубастее','безобиднее'],venom:['ядовитее','менее ядовит'],camo:['незаметнее','заметнее'],fert:['плодовитее','реже размножается'],diet:['хищнее','травояднее'],social:['стайнее','одиночнее'],intel:['умнее','проще умом'],topt:['теплолюбивее','холодолюбивее'],ttol:['выносливее к климату','капризнее к климату'],swim:['лучше плавает','хуже плавает'],fly:['лучше летает','хуже летает'],dig:['лучше роет','хуже роет'],life:['живёт дольше','живёт меньше'],aggr:['агрессивнее','миролюбивее'],fear:['осторожнее','смелее'],rot:['ест падаль охотнее','брезгливее'],night:['лучше видит ночью','хуже видит ночью']};
+function describeDiff(g,m,ref,refM){
+ const d=[];for(const i of SPEC_GENES)d.push([i,g[i]-ref[i]]);
+ d.sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+ const out=[];
+ for(let k=0;k<2;k++){const [i,v]=d[k];if(Math.abs(v)<0.05)break;out.push(DESC[GN[i]][v>0?0:1]);}
+ for(let i=0;i<MODS.length;i++){const b=1<<i;if((m&b)&&!(refM&b))out.push('+ '+MODS[i].ru.toLowerCase());else if(!(m&b)&&(refM&b))out.push('утратил: '+MODS[i].ru.toLowerCase());}
+ return out.join(', ');
+}
+function newSpecies(founder,parent){
+ const id=S.species.length;
+ if(parent){founder.g[G.hue]=(founder.g[G.hue]+(R()<0.5?-1:1)*(0.07+R()*0.12)+1)%1;}
+ const sp={id,parent:parent?parent.id:-1,born:S.day,died:-1,player:parent?parent.player:false,ref:Float32Array.from(founder.g),refM:founder.m,
+  count:0,peak:0,hist:[],hue:founder.g[G.hue]*360,name:makeName(founder),announced:false,root:parent?parent.root:id,
+  desc:parent?describeDiff(founder.g,founder.m,parent.ref,parent.refM):'',diet:founder.g[G.diet],_mc:null};
+ sp.col='hsl('+sp.hue.toFixed(0)+',70%,'+(sp.player?'60%':'52%')+')';
+ S.species.push(sp);founder.sp=id;return sp;
+}
+function geneDist(g,ref){let s=0;for(const i of SPEC_GENES){const d=g[i]-ref[i];s+=d*d;}return Math.sqrt(s);}
+function popcount(x){let n=0;while(x){x&=x-1;n++;}return n;}
+
+function mutate(g,w,m){
+ const sig=0.008+g[G.mut]*0.05;
+ for(let i=0;i<NG;i++)if(R()<0.35)g[i]+=gauss()*sig;
+ g[G.hue]=g[G.hue]-Math.floor(g[G.hue]);
+ for(let i=0;i<NG;i++)if(i!==G.hue)g[i]=clamp(g[i],0,1);
+ for(let i=0;i<NW;i++)if(R()<0.08)w[i]+=gauss()*sig*4;
+ let macro=null;
+ if(R()<0.004*(0.5+g[G.mut])){
+  const r=R();
+  if(r<0.6){const k=(R()*MODS.length)|0;if(!(m&(1<<k))){m|=1<<k;macro={t:'gain',k};}}
+  else if(r<0.8){const own=[];for(let k=0;k<MODS.length;k++)if(m&(1<<k))own.push(k);if(own.length){const k=pick(own);m&=~(1<<k);macro={t:'lose',k};}}
+  else{let i=(R()*NG)|0;if(i===G.hue)i=G.size;const dl=(R()<0.5?-1:1)*(0.2+R()*0.2);g[i]=clamp(g[i]+dl,0,1);macro={t:'gene',i,up:dl>0};}
+ }
+ return [m,macro];
+}
+function makeChild(a,b){
+ let g,w,m;
+ if(b){
+  g=new Float32Array(NG);w=new Float32Array(NW);
+  for(let i=0;i<NG;i++){const r=R();g[i]=r<0.35?a.g[i]:r<0.7?b.g[i]:(a.g[i]+b.g[i])*0.5;}
+  if(Math.abs(a.g[G.hue]-b.g[G.hue])>0.5)g[G.hue]=a.g[G.hue];
+  for(let i=0;i<NW;i++){const r=R();w[i]=r<0.4?a.w[i]:r<0.8?b.w[i]:(a.w[i]+b.w[i])*0.5;}
+  m=(a.m&b.m)|((a.m^b.m)&(R()<0.5?a.m:b.m));
+ }else{g=Float32Array.from(a.g);w=Float32Array.from(a.w);m=a.m;}
+ const res=mutate(g,w,m);m=res[0];
+ const x=clamp(a.x+(R()-0.5)*6,2,WW-2),y=clamp(a.y+(R()-0.5)*6,2,WH-2);
+ const c=newCreature(g,w,m,a.sp,x,y);c.age=0;c.gen=a.gen+1;
+ if(!passable(c,c.ti)){c.x=a.x;c.y=a.y;c.ti=a.ti;}
+ const sp=S.species[a.sp];
+ const d=geneDist(g,sp.ref)+popcount(m^sp.refM)*0.15;
+ if(d>SPEC_T)newSpecies(c,sp);
+ else{const ref=sp.ref;for(let i=0;i<NG;i++)ref[i]+=(g[i]-ref[i])*0.02;}
+ if(res[1]){
+  c.macro=res[1];S.macros++;
+  const csp=S.species[c.sp];
+  if(csp.player&&res[1].t==='gain'&&S.day-S.lastMacroLog>=3){S.lastMacroLog=S.day;log('Мутация в твоей линии: у особи вида «'+csp.name+'» появились '+MODS[res[1].k].ru.toLowerCase()+'. Если признак полезен, он распространится.','mut');}
+ }
+ return c;
+}
+function reproduce(c){
+ let mate=c.mate;if(mate&&(mate.dead||mate.sp!==c.sp))mate=null;
+ const n=c.litter;let share=c.energy*0.6;c.energy-=share;
+ if(mate){const ms=mate.energy*0.15;mate.energy-=ms;share+=ms;mate.cool=Math.max(mate.cool,(DAY*0.3)|0);}
+ c.cool=(DAY*(0.6+(1-c.g[G.fert])*1.2))|0;
+ for(let k=0;k<n;k++){const ch=makeChild(c,mate);ch.energy=Math.min(ch.maxE*0.8,share/n*0.9);if(ch.energy<1)continue;S.born.push(ch);S.births++;}
+}
+function addMeat(ti,amt){const m=S.meat[ti];S.rot[ti]=m+amt>0?S.rot[ti]*m/(m+amt):0;S.meat[ti]=m+amt;}
+function die(c,cause){
+ if(c.dead)return;c.dead=true;c.cause=cause;
+ addMeat(c.ti,c.B*2.2*(0.4+Math.max(0,c.energy)/c.maxE));
+ S.deathCause[cause]=(S.deathCause[cause]||0)+1;
+}
+function foodVal(c,ti){
+ const b=S.biome[ti];let v=0;
+ if(c.plantEff>0.05&&(b>SHALLOW||c.swimE>0.4))v+=S.plant[ti]*c.plantEff;
+ if(c.meatEff>0.05)v+=S.meat[ti]*c.meatEff*2.5;
+ return v;
+}
+function think(c){
+ const L=S.light,lf=0.4+0.6*L,vis=lf+(1-lf)*c.nightE;
+ const sense=c.sense*vis,s2=sense*sense;
+ const cx=(c.x/CELL)|0,cy=(c.y/CELL)|0,rad=Math.min(3,Math.ceil(sense/CELL));let visits=0;
+ let threat=null,td2=1e12,prey=null,pd2=1e12,kinN=0,kx=0,ky=0,mate=null,checks=0;
+ const myPow=c.power*c.packB,hunger=1-c.energy/c.maxE;
+ const wantMeat=c.diet>0.35&&hunger>0.32;
+ const x0=Math.max(0,cx-rad),x1=Math.min(GW-1,cx+rad),y0=Math.max(0,cy-rad),y1=Math.min(GH-1,cy+rad);
+ const Bm=S.biome;
+ outer:for(let gy=y0;gy<=y1;gy++)for(let gx=x0;gx<=x1;gx++){
+  for(let j=head[gy*GW+gx];j!==-1;j=nxt[j]){
+   if(++visits>140)break outer;const o=cs[j];if(o===c||o.dead||o.hidden>0)continue;
+   const dx=o.x-c.x,dy=o.y-c.y,d2=dx*dx+dy*dy;if(d2>s2)continue;
+   const cam=1-o.camoE*COVER[Bm[o.ti]]*0.75;if(d2>s2*cam*cam)continue;
+   if(++checks>70)break outer;
+   const same=o.sp===c.sp;
+   if(same){
+    if(c.sick>0&&!o.imm&&o.sick<=0&&d2<100&&R()<0.04)o.sick=DAY*2;
+    if(!mate&&d2<900&&o.age>o.mature&&o.energy>o.maxE*0.5&&o.cool<=0)mate=o;
+    if(c.social>0.2){kinN++;kx+=dx;ky+=dy;continue;}
+   }
+   const oPow=o.power*o.packB;
+   if((o.diet>0.35||o.aggr>0.62)&&!(same&&o.social>0.2)){
+    const danger=oPow-(myPow*(1.3-c.fear)+c.def*0.8);
+    if(danger>0&&d2<td2){td2=d2;threat=o;}
+   }
+   const war=(!same&&c.aggr>0.62&&hunger<0.7)||(same&&c.social<0.2&&c.aggr>0.45&&hunger>0.45&&d2<400),cannibal=same&&hunger>0.65&&c.diet>0.3;
+   if((wantMeat&&(!same||cannibal))||war){
+    const str=myPow*(1.1-0.3*c.fear)-(o.def*0.7+oPow*0.6);
+    if(str>0&&d2<pd2){pd2=d2;prey=o;}
+   }
+  }
+ }
+ c.kinN=kinN;c.packB=1+Math.min(kinN,c.packMax)*0.22*c.social*((c.m&MB.voice)?1.7:1);
+ c.mate=mate;c.target=prey;c.threat=threat;
+ const sd=clamp(c.sense*0.4,14,40),here=foodVal(c,c.ti);
+ let fx=0,fy=0;
+ for(let k=0;k<8;k++){
+  const tx=c.x+DX[k]*sd,ty=c.y+DY[k]*sd;let v;
+  if(tx<0||ty<0||tx>=WW||ty>=WH)v=-3;else{const ti=tileIdx(tx,ty);v=passable(c,ti)?foodVal(c,ti)-here*0.5:-3;}
+  fx+=DX[k]*v;fy+=DY[k]*v;
+ }
+ const T=tempAt(c.x,c.y);
+ c.stress=T<c.tLo?c.tLo-T:T>c.tHi?T-c.tHi:0;
+ let tdir=0;
+ if(c.stress>0){const mid=(c.tLo+c.tHi)*0.5;const tu=tempAt(c.x,Math.max(0,c.y-50)),tdn=tempAt(c.x,Math.min(WH-1,c.y+50));tdir=Math.abs(tu-mid)<Math.abs(tdn-mid)?-1:1;}
+ let ax=0,ay=0,spd=0.35+hunger*0.5,state=hunger>0.45?'ищет еду':'пасётся';
+ c.wa+=(R()-0.5)*0.6;ax+=Math.cos(c.wa)*0.4;ay+=Math.sin(c.wa)*0.4;
+ const fl=Math.hypot(fx,fy);
+ if(fl>0.001){const w=0.4+hunger*2.2;ax+=fx/fl*w;ay+=fy/fl*w;}
+ let kl=0;
+ if(kinN>0){kl=Math.hypot(kx,ky)+0.001;const w=c.social*1.6*(kl/kinN>12?1:-0.4);ax+=kx/kl*w;ay+=ky/kl*w;if(kinN>=2)state='в стае ('+(kinN+1)+')';}
+ if(c.stress>0){ay+=tdir*Math.min(3,c.stress*0.25);state=T<c.tLo?'мёрзнет, ищет тепло':'перегрев, ищет прохладу';}
+ if(mate&&c.energy>0.65*c.maxE&&c.age>c.mature&&c.cool<=0){const md=Math.sqrt((mate.x-c.x)**2+(mate.y-c.y)**2)+0.001;ax+=(mate.x-c.x)/md*1.2;ay+=(mate.y-c.y)/md*1.2;state='ищет пару';}
+ let pdx=0,pdy=0,tdx=0,tdy=0;
+ if(prey){const pd=Math.sqrt(pd2)+0.001;pdx=(prey.x-c.x)/pd;pdy=(prey.y-c.y)/pd;const w=1.5+hunger*2+c.aggr;ax+=pdx*w;ay+=pdy*w;spd=c.diet>0.4?1.18:1;state=(prey.sp===c.sp)?'каннибализм':wantMeat?'охотится':'воюет';}
+ if(threat){const td=Math.sqrt(td2)+0.001;tdx=(threat.x-c.x)/td;tdy=(threat.y-c.y)/td;const w=1.5+c.fear*3;ax-=tdx*w;ay-=tdy*w;spd=1;state='убегает';
+  const b=Bm[c.ti];
+  if(c.digE>0.35&&c.hideCool<=0&&b>SHALLOW&&b!==MOUNT&&b!==SNOW){c.hidden=(60+c.digE*140)|0;c.hideCool=(DAY*0.6)|0;state='прячется в норе';}
+ }
+ if(c.intelE>0.02){
+  IN[0]=1;IN[1]=c.energy/c.maxE;IN[2]=c.hp/c.maxHp;IN[3]=fl>0.001?fx/fl:0;IN[4]=fl>0.001?fy/fl:0;
+  IN[5]=tdx;IN[6]=tdy;IN[7]=pdx;IN[8]=pdy;IN[9]=kinN?kx/kl:0;IN[10]=kinN?ky/kl:0;IN[11]=tdir;
+  const w=c.w;
+  for(let j=0;j<NH;j++){let s=0;const o=j*NI;for(let i=0;i<NI;i++)s+=IN[i]*w[o+i];HID[j]=s/(1+Math.abs(s));}
+  const ob=NI*NH;let o0=0,o1=0,o2=0;
+  for(let j=0;j<NH;j++){o0+=HID[j]*w[ob+j];o1+=HID[j]*w[ob+NH+j];o2+=HID[j]*w[ob+2*NH+j];}
+  o0=o0/(1+Math.abs(o0));o1=o1/(1+Math.abs(o1));o2=o2/(1+Math.abs(o2));
+  const k=c.intelE*3;ax+=o0*k;ay+=o1*k;c.nnAgg=o2*c.intelE;
+ }
+ const al=Math.hypot(ax,ay);if(al>0.001){c.dx=ax/al;c.dy=ay/al;}
+ c.spdF=Math.min(1.3,spd);c.state=state;
+}
+function move(c){
+ let ms=c.maxSpd*c.spdF;const b=S.biome[c.ti];
+ if(c.flyE<=0.3){
+  if(b<=SHALLOW)ms*=0.3+0.7*c.swimE;
+  else{if(c.swimE>0.6)ms*=1.6-c.swimE;if(b===MOUNT)ms*=c.digE>0.5?0.8:0.55;else if(b===SNOW)ms*=0.7;else if(b===FOREST)ms*=0.88;}
+ }
+ if(c.sick>0)ms*=0.6;if(c.hp<c.maxHp*0.3)ms*=0.7;
+ c.vx+=(c.dx*ms-c.vx)*0.25;c.vy+=(c.dy*ms-c.vy)*0.25;
+ let nx=c.x+c.vx,ny=c.y+c.vy;
+ if(nx<2||nx>WW-2){c.vx=-c.vx;nx=c.x;c.wa=Math.PI-c.wa;}
+ if(ny<2||ny>WH-2){c.vy=-c.vy;ny=c.y;c.wa=-c.wa;}
+ const nti=tileIdx(nx,ny);
+ if(nti!==c.ti&&!passable(c,nti)){c.vx*=-0.3;c.vy*=-0.3;c.wa+=2+R();return;}
+ c.x=nx;c.y=ny;c.ti=nti;
+ c.energy-=0.006*c.B*(c.vx*c.vx+c.vy*c.vy)*(c.flyE>0.3?1.6:1)*(c.spdF>1?2:1);
+}
+function eat(c){
+ if(c.energy>=c.maxE*0.98)return;
+ const ti=c.ti,b=S.biome[ti];
+ if(c.plantEff>0.05&&(b>SHALLOW||c.swimE>0.4)){const p=S.plant[ti];if(p>0.02){const bite=Math.min(p,0.035*Math.pow(c.B,0.75));S.plant[ti]=p-bite;c.energy+=bite*c.plantEff*10;}}
+ if(c.meatEff>0.05){const mt=S.meat[ti];if(mt>0.01){const bite=Math.min(mt,0.08*Math.pow(c.B,0.75));S.meat[ti]=mt-bite;const bad=Math.max(0,S.rot[ti]-0.4)*(1-c.rotE);c.energy+=bite*c.meatEff*16*(1-bad);c.poison+=bite*bad*0.6;}}
+ if(c.energy>c.maxE)c.energy=c.maxE;
+}
+function combat(c){
+ const t=c.target;if(!t||t.dead||t.hidden>0)return;
+ const dx=t.x-c.x,dy=t.y-c.y,reach=c.r+t.r+1.5;
+ if(dx*dx+dy*dy>reach*reach)return;
+ c.state=t.sp===c.sp?'каннибализм':'сражается';
+ t.hp-=c.power*c.packB*0.22/(1+t.def*t.packB*1.6);c.energy-=0.01*c.B;
+ if(c.venomE>0)t.poison+=c.venomE*0.04;
+ if(t.power>0.15&&t.fear<0.7)c.hp-=t.power*t.packB*0.12/(1+c.def*1.6);
+ if(t.hp<=0){die(t,'убит');c.kills++;c.target=null;if(t.sp!==c.sp){const k=c.sp+':'+t.sp;S.killPairs[k]=(S.killPairs[k]||0)+1;}}
+ if(c.hp<=0)die(c,'погиб в бою');
+}
+function update(c){
+ c.age++;if(c.cool>0)c.cool--;if(c.hideCool>0)c.hideCool--;
+ if(c.hidden>0){c.hidden--;c.energy-=c.meta*0.5;c.state='прячется в норе';if(c.energy<=0)die(c,'голод');return;}
+ if((c.id+S.tick)%3===0)think(c);
+ move(c);eat(c);combat(c);if(c.dead)return;
+ c.energy-=c.meta;
+ if(c.stress>0){c.hp-=c.stress*0.004;c.energy-=c.stress*0.001*c.B;}
+ if(c.poison>0){c.hp-=c.poison*0.05;c.poison*=0.985;if(c.poison<0.001)c.poison=0;}
+ if(c.sick>0){c.sick--;c.hp-=0.012*c.B;if(c.sick===0)c.imm=true;}
+ const b=S.biome[c.ti];
+ if(c.flyE<=0.3){if(b===DEEP&&c.swimE<0.45)c.hp-=0.06*c.B;else if(b>SHALLOW&&c.swimE>=0.9)c.hp-=0.03*c.B;}
+ if(c.energy>c.maxE*0.35&&c.hp<c.maxHp)c.hp=Math.min(c.maxHp,c.hp+0.006*c.B);
+ if(c.hp<=0){die(c,c.sick>0?'болезнь':c.poison>0.05?'яд':c.stress>0?'климат':'раны');return;}
+ if(c.energy<=0){die(c,'голод');return;}
+ if(c.age>c.life&&R()<0.01){die(c,'старость');return;}
+ if(c.age>c.mature&&c.cool<=0&&c.energy>0.72*c.maxE&&cs.length+S.born.length<S.cap)reproduce(c);
+}
+function updatePlants(){
+ const P=S.plant,M=S.meat,Rt=S.rot,Bm=S.biome,bt=S.baseT,off=S.climOff-S.dust,gm=S.growMul/(1+S.dust*0.15);
+ for(let y=0;y<TH;y++){const rs=S.rowSeason[y]+off;
+  for(let x=0;x<TW;x++){const i=y*TW+x;const cap=PLANT_CAP[Bm[i]];let f=(bt[i]+rs-18)/24;f=1-f*f;if(f<0)f=0;
+   let p=P[i];if(p<cap)p+=0.009*f*gm*(p+0.25)*(1-p/cap);else p-=(p-cap)*0.02;P[i]=p;
+   const m=M[i];if(m>0){const nm=m*0.995;Rt[i]+=0.004;if(nm<0.01||Rt[i]>=1){M[i]=0;Rt[i]=0;}else M[i]=nm;}
+  }}
+}
+function buildGrid(){
+ head.fill(-1);if(nxt.length<cs.length)nxt=new Int32Array(cs.length*2);
+ for(let i=0;i<cs.length;i++){const c=cs[i];let gx=(c.x/CELL)|0,gy=(c.y/CELL)|0;if(gx>=GW)gx=GW-1;if(gy>=GH)gy=GH-1;const k=gy*GW+gx;nxt[i]=head[k];head[k]=i;}
+}
+function countSpecies(){
+ for(const sp of S.species)sp.count=0;
+ let pc=0;
+ for(const c of cs){const sp=S.species[c.sp];sp.count++;if(sp.player)pc++;}
+ S.playerCount=pc;S.alive=cs.length;
+ for(const sp of S.species){if(sp.count>sp.peak)sp.peak=sp.count;
+  if(!sp.announced&&sp.count>=10){sp.announced=true;if(sp.parent>=0){const p=S.species[sp.parent];
+   log((sp.player?'Твоя линия: ':'')+'появился новый вид «'+sp.name+'» (от «'+p.name+'»)'+(sp.desc?': '+sp.desc:''),sp.player?'mine':'spec');if(sp.player)S.ep+=3;}}}
+}
+function log(text,type){S.log.push({d:S.day,text,type:type||'info'});if(S.log.length>300)S.log.splice(0,S.log.length-300);if(S.onLog)S.onLog(text,type);}
+function landPoint(tries){for(let k=0;k<(tries||200);k++){const x=2+R()*(WW-4),y=2+R()*(WH-4);const b=S.biome[tileIdx(x,y)];if(b>SHALLOW&&b!==SNOW&&b!==MOUNT)return[x,y];}return[WW/2,WH/2];}
+function meteor(){
+ const[x,y]=landPoint();const r=(6+R()*9)*TILE;let killed=0;
+ for(const c of cs){if(c.dead)continue;const d2=(c.x-x)**2+(c.y-y)**2;if(d2<r*r){if((c.digE>0.4||c.hidden>0)&&R()<0.65)continue;if(c.flyE>0.5&&R()<0.3)continue;die(c,'метеорит');killed++;}}
+ const tr=r/TILE,tx=x/TILE,ty=y/TILE;
+ for(let yy=Math.max(0,Math.floor(ty-tr*1.6));yy<=Math.min(TH-1,Math.ceil(ty+tr*1.6));yy++)for(let xx=Math.max(0,Math.floor(tx-tr*1.6));xx<=Math.min(TW-1,Math.ceil(tx+tr*1.6));xx++){
+  const d=Math.hypot(xx-tx,yy-ty);const i=yy*TW+xx;if(d<tr*1.6)S.plant[i]=0;if(d<tr*0.35)S.elev[i]=Math.min(S.elev[i],S.seaLevel-0.05);}
+ S.dust+=5;classifyAll();S.fx.push({t:'meteor',x,y,r,age:0});
+ log('Падение метеорита! Погибло особей: '+killed+'. Пыль в небе охлаждает планету.','cat');
+}
+function plague(){
+ let best=null;for(const sp of S.species)if(sp.count>=40&&(!best||sp.count>best.count))best=sp;
+ if(!best)return;let n=0;for(const c of cs)if(c.sp===best.id&&!c.imm&&R()<0.08){c.sick=DAY*2;n++;}
+ log('Эпидемия поразила вид «'+best.name+'» (заражено '+n+'). Болезнь передаётся сородичам при контакте.','cat');
+}
+function changeEpoch(){
+ const E=[{k:'normal',name:'Умеренная эпоха',t:0,sea:0},{k:'warm',name:'Тёплая эпоха',t:5,sea:0.05},{k:'ice',name:'Ледниковый период',t:-9,sea:-0.07},{k:'hot',name:'Великое потепление',t:9,sea:0.09}];
+ let e;do{e=R()<0.12?E[3]:pick(E.slice(0,3));}while(e.k===S.epoch.k);
+ S.epoch=e;
+ const txt={normal:'Климат возвращается к умеренному.',warm:'Теплеет, море наступает на сушу.',ice:'Наступает ледниковый период: море отступает, открываются сухопутные мосты между островами, моря у полюсов замерзают.',hot:'Великое потепление! Тропики раскаляются, острова уходят под воду.'};
+ log('Новая эпоха: '+e.name+'. '+txt[e.k],'epoch');
+}
+function daily(){
+ S.day++;computeSeason();
+ for(const sp of S.species)sp._mc=null;
+ for(const c of cs){const sp=S.species[c.sp];if(!sp._mc)sp._mc=new Int32Array(MODS.length);if(c.m)for(let k=0;k<MODS.length;k++)if(c.m&(1<<k))sp._mc[k]++;}
+ for(const sp of S.species){
+  if(sp.count>0){let rm=0;for(let k=0;k<MODS.length;k++)if(sp._mc&&sp._mc[k]*2>sp.count)rm|=1<<k;sp.refM=rm;
+   sp.hist.push([S.day,sp.count]);if(sp.hist.length>500)sp.hist=sp.hist.filter((_,i)=>i%2===0);}
+  else if(sp.died<0){sp.died=S.day;if(sp.peak>=10){sp.hist.push([S.day,0]);log((sp.player?'Твоя линия: ':'')+'вымер вид «'+sp.name+'» (максимум был '+sp.peak+' особей)',sp.player?'mineBad':'ext');}}
+ }
+ S.histTotal.push([S.day,cs.length]);S.histPlayer.push([S.day,S.playerCount]);
+ if(S.histTotal.length>500){S.histTotal=S.histTotal.filter((_,i)=>i%2===0);S.histPlayer=S.histPlayer.filter((_,i)=>i%2===0);}
+ S.ep+=Math.sqrt(S.playerCount)*0.25;
+ let wars=0;
+ const pairs=Object.entries(S.killPairs).sort((a,b)=>b[1]-a[1]);
+ for(const[k,v]of pairs){if(v<15||wars>=2)break;const[a,b]=k.split(':').map(Number);const A=S.species[a],B=S.species[b];if(!A.announced||!B.announced)continue;
+  const mine=A.player||B.player;if((S.warLog[k]||-99)>S.day-(mine?4:12))continue;S.warLog[k]=S.day;
+  if(A.diet<0.35){log('Война видов: «'+A.name+'» за день уничтожили '+v+' особей «'+B.name+'»',(A.player||B.player)?'war':'warAI');wars++;}
+  else if(v>=30){log('Бойня: хищники «'+A.name+'» за день добыли '+v+' особей «'+B.name+'»',(A.player||B.player)?'war':'warAI');wars++;}}
+ S.killPairs={};
+ if(S.growUntil&&S.day>=S.growUntil){S.growMul=1;S.growUntil=0;}
+ if(S.day>=S.nextEvent){S.nextEvent=S.day+14+R()*26;const r=R();
+  if(r<0.28)meteor();else if(r<0.52)plague();
+  else if(r<0.76){S.growMul=0.35;S.growUntil=S.day+SEASON_DAYS;log('Засуха: растения почти перестали расти на '+SEASON_DAYS+' дней.','cat');}
+  else{S.growMul=1.7;S.growUntil=S.day+SEASON_DAYS;log('Благодатный сезон: растения растут втрое быстрее обычного.','good');}}
+ if(S.day>=S.nextEpoch){changeEpoch();S.nextEpoch=S.day+YEAR_DAYS*(3+R()*4);}
+ S.climOff+=clamp(S.epoch.t-S.climOff,-0.12,0.12);
+ S.seaLevel+=clamp(S.epoch.sea-S.seaLevel,-0.001,0.001);
+ S.dust*=0.95;if(S.dust<0.05)S.dust=0;
+ if(Math.abs(S.climOff-S.classT)>0.6||Math.abs(S.seaLevel-S.classSea)>0.005)classifyAll();
+ if(!S.lost&&S.playerCount===0){S.lost=true;log('Твоя эволюционная линия полностью вымерла на '+(S.day/YEAR_DAYS+1|0)+'-й год.','mineBad');}
+ const share=cs.length?S.playerCount/cs.length:0;
+ if(share>0.5)S.domDays++;else S.domDays=0;
+ if(!S.won&&S.domDays>=YEAR_DAYS){S.won=true;log('Твоя линия доминирует на планете целый год! Победа. Можно продолжать эволюцию.','win');}
+}
+function step(){
+ S.tick++;computeLight();
+ if(S.tick%DAY===0)daily();
+ if(S.tick%4===0)updatePlants();
+ S.born.length=0;
+ const n=cs.length;
+ for(let i=0;i<n;i++){const c=cs[i];if(!c.dead)update(c);}
+ let j=0;for(let i=0;i<n;i++){const c=cs[i];if(!c.dead)cs[j++]=c;}cs.length=j;
+ for(const b of S.born)if(cs.length<S.cap)cs.push(b);
+ buildGrid();
+ if(S.tick%10===0)countSpecies();
+ for(const f of S.fx)f.age++;S.fx=S.fx.filter(f=>f.age<180);
+}
+function spawnSpecies(diet,player,n){
+ const[x,y]=landPoint();const T=tempAt(x,y)+0;
+ const g0=speciesGenome(diet,T);const w0=baseBrain();
+ const founder=newCreature(g0,w0,0,0,x,y);
+ const sp=newSpecies(founder,null);sp.player=player;sp.col='hsl('+sp.hue.toFixed(0)+',70%,'+(player?'60%':'52%')+')';
+ sp.announced=true;
+ let placed=0,tries=0;
+ while(placed<n&&tries<n*30){tries++;
+  const px=clamp(x+gauss()*90,3,WW-3),py=clamp(y+gauss()*90,3,WH-3);
+  const g=Float32Array.from(g0);for(let i=0;i<NG;i++)if(i!==G.hue)g[i]=clamp(g[i]+gauss()*0.03,0,1);
+  const w=Float32Array.from(w0);for(let i=0;i<NW;i++)w[i]+=gauss()*0.05;
+  const c=newCreature(g,w,0,sp.id,px,py);if(!passable(c,c.ti))continue;cs.push(c);placed++;}
+ return sp;
+}
+function newGame(o){
+ o=o||{};
+ S.seed=(o.seed!=null?o.seed:(R()*1e9))|0;S.cap=o.cap||5300;S.tick=0;S.day=0;S.nextId=1;
+ S.seaLevel=0;S.climOff=0;S.dust=0;S.light=1;S.growMul=1;S.growUntil=0;
+ S.epoch={k:'normal',name:'Умеренная эпоха',t:0,sea:0};S.nextEpoch=YEAR_DAYS*(3+R()*3);S.nextEvent=16+R()*20;
+ S.species=[];S.log=[];S.histTotal=[];S.histPlayer=[];S.ep=15;S.lost=false;S.won=false;S.domDays=0;S.fx=[];S.killPairs={};S.warLog={};
+ S.births=0;S.macros=0;S.deathCause={};S.lastMacroLog=-1;S.born=[];S.playerCount=0;S.alive=0;
+ S.rowSeason=new Float32Array(TH);S.biome=new Uint8Array(TW*TH);S.plant=new Float32Array(TW*TH);S.meat=new Float32Array(TW*TH);S.rot=new Float32Array(TW*TH);
+ genWorld(S.seed);classifyAll();computeSeason();computeLight();
+ for(let i=0;i<TW*TH;i++)S.plant[i]=PLANT_CAP[S.biome[i]]*0.6;
+ cs=[];
+ const nAI=o.ai||7;const pd=o.playerDiet!=null?o.playerDiet:0.15;
+ const pool=[0.05,0.1,0.15,0.2,0.5,0.8,0.12,0.55,0.85,0.08,0.25,0.75];
+ spawnSpecies(pd,true,170);
+ for(let i=0;i<nAI;i++)spawnSpecies(pool[i%pool.length]+(R()-0.5)*0.06,false,pool[i%pool.length]>0.6?120:150);
+ buildGrid();countSpecies();
+ log('Мир сотворён. На островах живут '+(nAI+1)+' примитивных вида, и все сражаются со всеми. Твой вид: «'+S.species[0].name+'».','epoch');
+}
+function nudgeGene(spId,gi,dir){
+ const cost=5;if(S.ep<cost)return false;let n=0;
+ for(const c of cs)if(c.sp===spId){c.g[gi]=gi===G.hue?((c.g[gi]+dir*0.05)+1)%1:clamp(c.g[gi]+dir*0.06,0,1);pheno(c);c.hp=Math.min(c.hp,c.maxHp);c.energy=Math.min(c.energy,c.maxE);n++;}
+ if(!n)return false;const sp=S.species[spId];sp.ref[gi]=clamp(sp.ref[gi]+dir*0.06,0,1);S.ep-=cost;return true;
+}
+function moduleCost(k){return 40;}
+function grantModule(spId,k){
+ const cost=moduleCost(k);if(S.ep<cost)return false;let n=0;
+ for(const c of cs)if(c.sp===spId){c.m|=1<<k;pheno(c);n++;}
+ if(!n)return false;S.species[spId].refM|=1<<k;S.ep-=cost;
+ log('Ты направил эволюцию: у вида «'+S.species[spId].name+'» появились '+MODS[k].ru.toLowerCase()+'.','mine');return true;
+}
+function removeModule(spId,k){
+ const cost=10;if(S.ep<cost)return false;let n=0;
+ for(const c of cs)if(c.sp===spId){c.m&=~(1<<k);pheno(c);c.hp=Math.min(c.hp,c.maxHp);n++;}
+ if(!n)return false;S.species[spId].refM&=~(1<<k);S.ep-=cost;return true;
+}
+function speciesStats(spId){
+ const avg=new Float32Array(NG),mc=new Int32Array(MODS.length);let n=0,gen=0,kills=0;
+ for(const c of cs)if(c.sp===spId){n++;for(let i=0;i<NG;i++)avg[i]+=c.g[i];for(let k=0;k<MODS.length;k++)if(c.m&(1<<k))mc[k]++;gen+=c.gen;kills+=c.kills;}
+ if(n)for(let i=0;i<NG;i++)avg[i]/=n;
+ return{n,avg,mc,gen:n?gen/n:0,kills};
+}
+function toB64(a){const u=new Uint8Array(a.buffer,a.byteOffset,a.byteLength);let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s);}
+function fromB64(s,T){const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return new T(u.buffer);}
+const PF=16;
+function serialize(){
+ const n=cs.length,F=new Float32Array(n*PF),Gq=new Uint16Array(n*NG),Wq=new Int16Array(n*NW);
+ cs.forEach((c,k)=>{F.set([c.x,c.y,c.vx,c.vy,c.energy,c.hp,c.age,c.sp,c.m,c.gen,c.kills,c.cool,c.poison,c.sick,c.imm?1:0,c.hidden],k*PF);
+  for(let i=0;i<NG;i++)Gq[k*NG+i]=Math.round(clamp(c.g[i],0,1)*65535);
+  for(let i=0;i<NW;i++)Wq[k*NW+i]=Math.round(clamp(c.w[i],-16,16)*2000);});
+ const st={};for(const k of['seed','cap','tick','day','nextId','seaLevel','climOff','dust','growMul','growUntil','epoch','nextEpoch','nextEvent','log','histTotal','histPlayer','ep','lost','won','domDays','births','macros','deathCause','lastMacroLog'])st[k]=S[k];
+ st.species=S.species.map(sp=>Object.assign({},sp,{ref:Array.from(sp.ref,v=>+v.toFixed(3)),_mc:null,hist:sp.peak>=8?sp.hist:[]}));
+ return JSON.stringify({v:2,st,elev:toB64(S.elev),plant:toB64(S.plant),meat:toB64(S.meat),rot:toB64(S.rot),F:toB64(F),G:toB64(Gq),W:toB64(Wq)});
+}
+function deserialize(str){
+ const d=JSON.parse(str);if(d.v!==2)throw new Error('неизвестный формат сохранения');
+ Object.assign(S,d.st);S.fx=[];S.killPairs={};S.warLog={};S.born=[];
+ S.rowSeason=new Float32Array(TH);S.biome=new Uint8Array(TW*TH);
+ genWorld(S.seed);S.elev=fromB64(d.elev,Float32Array);S.plant=fromB64(d.plant,Float32Array);S.meat=fromB64(d.meat,Float32Array);S.rot=fromB64(d.rot,Float32Array);
+ S.species=d.st.species.map(sp=>Object.assign(sp,{ref:Float32Array.from(sp.ref)}));
+ classifyAll();computeSeason();computeLight();
+ const F=fromB64(d.F,Float32Array),Gq=fromB64(d.G,Uint16Array),Wq=fromB64(d.W,Int16Array);const n=F.length/PF;cs=[];
+ for(let k=0;k<n;k++){const o=k*PF;
+  const g=new Float32Array(NG),w=new Float32Array(NW);for(let i=0;i<NG;i++)g[i]=Gq[k*NG+i]/65535;for(let i=0;i<NW;i++)w[i]=Wq[k*NW+i]/2000;
+  const c=newCreature(g,w,F[o+8]|0,F[o+7]|0,F[o],F[o+1]);
+  c.vx=F[o+2];c.vy=F[o+3];c.energy=F[o+4];c.hp=F[o+5];c.age=F[o+6];c.gen=F[o+9];c.kills=F[o+10];c.cool=F[o+11];c.poison=F[o+12];c.sick=F[o+13];c.imm=F[o+14]>0;c.hidden=F[o+15];
+  cs.push(c);}
+ buildGrid();countSpecies();
+}
+return{S,get cs(){return cs},newGame,step,serialize,deserialize,pheno,tempAt,tileIdx,nudgeGene,grantModule,removeModule,moduleCost,speciesStats,
+ GN,G,NG,GENE_RU,MODS,MB,BIOME_NAMES,PLANT_CAP,TILE,TW,TH,WW,WH,DAY,YEAR_DAYS,SEASON_DAYS,DEEP,SHALLOW,SNOW};
+})();
+
+
+</script>
+<script>
+(function(){
+'use strict';
+const E=EVO,S=E.S,G=E.G;
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d'),view=$('view');
+const terr=document.createElement('canvas');terr.width=E.TW;terr.height=E.TH;
+const tctx=terr.getContext('2d');const img=tctx.createImageData(E.TW,E.TH);
+const BC=[[24,50,88],[40,90,135],[214,198,150],[150,168,88],[58,108,56],[212,182,112],[148,160,150],[118,108,98],[232,238,245]];
+let W=0,H=0,dpr=1,cam={x:0,y:0,z:1};
+let speed=1,running=false,frame=0,selC=null,selSp=-1,mySp=0,follow=false,lostShown=false,wonShown=false;
+let simDays=0,simT0=performance.now(),dps=0;
+const SAVE_KEY='evo_save_v1';
+
+function resize(){const r=view.getBoundingClientRect();dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
+function fit(){cam.z=Math.min(W/E.WW,H/E.WH);cam.x=(E.WW-W/cam.z)/2;cam.y=(E.WH-H/cam.z)/2;}
+window.addEventListener('resize',()=>{resize();});
+
+function drawTerrain(){
+ const d=img.data,B=S.biome,P=S.plant,M=S.meat,cap=E.PLANT_CAP;
+ for(let i=0;i<B.length;i++){
+  const b=B[i],c=BC[b];let r=c[0],g=c[1],bl=c[2];
+  const f=Math.min(1,P[i]/(cap[b]||1));
+  if(b>=2&&b!==8){r*=1.05-0.3*f;g*=0.9+0.12*f;bl*=1.0-0.25*f;}
+  else if(b<=1){g+=f*10;}
+  if(M[i]>1.5){r=Math.min(255,r+35);g*=0.9;}
+  const o=i*4;d[o]=r;d[o+1]=g;d[o+2]=bl;d[o+3]=255;
+ }
+ tctx.putImageData(img,0,0);
+}
+function render(){
+ ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#0b0d12';ctx.fillRect(0,0,cv.width,cv.height);
+ const z=cam.z*dpr;ctx.setTransform(z,0,0,z,-cam.x*z,-cam.y*z);
+ ctx.imageSmoothingEnabled=false;ctx.drawImage(terr,0,0,E.WW,E.WH);
+ const x0=cam.x-10,y0=cam.y-10,x1=cam.x+W/cam.z+10,y1=cam.y+H/cam.z+10;
+ const minR=1.3/cam.z,detail=cam.z>2.4,lw=1/cam.z;
+ const cs=E.cs,sp=S.species;
+ for(let i=0;i<cs.length;i++){
+  const c=cs[i];if(c.x<x0||c.x>x1||c.y<y0||c.y>y1)continue;
+  const s=sp[c.sp];const r=Math.max(c.r,minR);
+  if(c.hidden>0){ctx.fillStyle='rgba(40,30,20,.8)';ctx.fillRect(c.x-r*0.6,c.y-r*0.6,r*1.2,r*1.2);continue;}
+  ctx.fillStyle=s.col;
+  if(cam.z>1.3){ctx.beginPath();ctx.arc(c.x,c.y,r,0,6.2832);ctx.fill();}else ctx.fillRect(c.x-r,c.y-r,r*2,r*2);
+  if(s.player&&cam.z>0.6){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=lw*1.4;if(cam.z>1.3){ctx.beginPath();ctx.arc(c.x,c.y,r+lw,0,6.2832);ctx.stroke();}else ctx.strokeRect(c.x-r-lw,c.y-r-lw,r*2+lw*2,r*2+lw*2);}
+  if(c.sp===selSp){ctx.strokeStyle='#ffe070';ctx.lineWidth=lw*1.5;ctx.beginPath();ctx.arc(c.x,c.y,r+2*lw+1,0,6.2832);ctx.stroke();}
+  if(detail)drawDetail(c,r,lw);
+ }
+ if(selC&&!selC.dead){
+  ctx.strokeStyle='#fff';ctx.lineWidth=lw*2;ctx.beginPath();ctx.arc(selC.x,selC.y,selC.r+6*lw+2,0,6.2832);ctx.stroke();
+  ctx.beginPath();ctx.arc(selC.x,selC.y,selC.sense,0,6.2832);ctx.strokeStyle='rgba(255,255,255,.18)';ctx.stroke();
+  const t=selC.target||selC.threat;if(t&&!t.dead){ctx.strokeStyle=selC.target?'rgba(255,90,90,.8)':'rgba(255,220,90,.8)';ctx.beginPath();ctx.moveTo(selC.x,selC.y);ctx.lineTo(t.x,t.y);ctx.stroke();}
+ }
+ for(const f of S.fx){if(f.t==='meteor'){const a=1-f.age/180;ctx.strokeStyle='rgba(255,140,40,'+a+')';ctx.lineWidth=lw*3;ctx.beginPath();ctx.arc(f.x,f.y,f.r*(0.3+f.age/120),0,6.2832);ctx.stroke();ctx.fillStyle='rgba(255,120,30,'+(a*0.25)+')';ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.2832);ctx.fill();}}
+ ctx.setTransform(1,0,0,1,0,0);
+ const dark=(1-S.light)*0.45+Math.min(0.25,S.dust*0.03);
+ if(dark>0.01){ctx.fillStyle='rgba(8,12,35,'+dark.toFixed(3)+')';ctx.fillRect(0,0,cv.width,cv.height);}
+}
+function drawDetail(c,r,lw){
+ const m=c.m,MB=E.MB;const a=Math.atan2(c.vy,c.vx),ca=Math.cos(a),sa=Math.sin(a);
+ ctx.lineWidth=lw*1.2;ctx.strokeStyle='rgba(20,20,25,.9)';
+ if(m&MB.shell){ctx.beginPath();ctx.arc(c.x,c.y,r*0.75,0,6.2832);ctx.stroke();}
+ if(m&MB.horns){ctx.beginPath();for(const s of[-0.5,0.5]){const b=a+s;ctx.moveTo(c.x+Math.cos(b)*r,c.y+Math.sin(b)*r);ctx.lineTo(c.x+Math.cos(a+s*0.6)*r*1.8,c.y+Math.sin(a+s*0.6)*r*1.8);}ctx.stroke();}
+ if(m&MB.wings){ctx.strokeStyle='rgba(235,235,255,.8)';ctx.beginPath();ctx.moveTo(c.x-sa*r*2.2,c.y+ca*r*2.2);ctx.lineTo(c.x+sa*r*2.2,c.y-ca*r*2.2);ctx.stroke();}
+ if(m&MB.fins){ctx.strokeStyle='rgba(120,200,255,.9)';ctx.beginPath();ctx.moveTo(c.x-ca*r,c.y-sa*r);ctx.lineTo(c.x-ca*r*1.9-sa*r*0.6,c.y-sa*r*1.9+ca*r*0.6);ctx.moveTo(c.x-ca*r,c.y-sa*r);ctx.lineTo(c.x-ca*r*1.9+sa*r*0.6,c.y-sa*r*1.9-ca*r*0.6);ctx.stroke();}
+ if(c.g[G.attack]>0.6){ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(c.x+ca*r*0.8-lw,c.y+sa*r*0.8-lw,lw*2,lw*2);}
+ if(c.sick>0){ctx.fillStyle='rgba(160,255,80,.9)';ctx.fillRect(c.x-lw,c.y-r-3*lw,lw*2,lw*2);}
+}
+
+/* input */
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y,moved:false};cv.setPointerCapture(e.pointerId);cv.classList.add('drag');});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;if(drag.moved){cam.x=drag.cx-dx/cam.z;cam.y=drag.cy-dy/cam.z;follow=false;}});
+cv.addEventListener('pointerup',e=>{cv.classList.remove('drag');if(drag&&!drag.moved)pickAt(e);drag=null;});
+cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const wx=cam.x+mx/cam.z,wy=cam.y+my/cam.z;
+ const nz=Math.max(Math.min(W/E.WW,H/E.WH)*0.8,Math.min(8,cam.z*Math.exp(-e.deltaY*0.0015)));cam.z=nz;cam.x=wx-mx/nz;cam.y=wy-my/nz;},{passive:false});
+function pickAt(e){
+ const r=cv.getBoundingClientRect();const wx=cam.x+(e.clientX-r.left)/cam.z,wy=cam.y+(e.clientY-r.top)/cam.z;
+ let best=null,bd=1e9;
+ for(const c of E.cs){const d=Math.sqrt((c.x-wx)**2+(c.y-wy)**2)-c.r;if(d<bd&&d<12/cam.z){bd=d;best=c;}}
+ selC=best;if(best){selSp=best.sp;if(S.species[best.sp].player)mySp=best.sp;}
+ updatePanels();
+}
+document.addEventListener('keydown',e=>{
+ if(e.target.tagName==='INPUT')return;
+ if(e.code==='Space'){e.preventDefault();setSpeed(speed===0?1:0);}
+ const k=['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6'].indexOf(e.code);if(k>=0)setSpeed([0,1,3,10,30,100][k]);
+ if(e.code==='KeyF'&&selC)follow=!follow;
+});
+function setSpeed(s){speed=s;document.querySelectorAll('#speeds button').forEach(b=>b.classList.toggle('on',+b.dataset.s===s));}
+$('speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setSpeed(+b.dataset.s);});
+
+/* toasts */
+function toast(text,cls){const d=document.createElement('div');d.className='toast '+(cls||'');d.textContent=text;$('toasts').prepend(d);setTimeout(()=>d.remove(),7000);while($('toasts').children.length>4)$('toasts').lastChild.remove();}
+S.onLog=(text,type)=>{
+ if(type==='cat')toast(text);else if(type==='epoch')toast(text,'epoch');else if(type==='win'||type==='mine')toast(text,'good');else if(type==='mineBad'||type==='war')toast(text,'bad');
+ logDirty=true;
+};
+let logDirty=true;
+
+/* panels */
+const fmtDay=d=>'год '+(Math.floor(d/E.YEAR_DAYS)+1)+', день '+(d%E.YEAR_DAYS+1);
+const dietName=d=>d<0.35?'травоядный':d<0.6?'всеядный':'хищник';
+function hud(){
+ const T=E.tempAt(E.WW/2,E.WH/2);
+ $('hud').innerHTML='<b>'+fmtDay(S.day)+'</b> · '+S.seasonName+' (север) · '+(S.light>0.35?'день':'ночь')+' · <b>'+S.epoch.name+'</b><br>'+
+  'Особей: <b>'+E.cs.length+'</b> · видов живо: <b>'+S.species.filter(s=>s.count>0).length+'</b> · твоя линия: <b style="color:#9fe0a8">'+S.playerCount+'</b> ('+(E.cs.length?Math.round(S.playerCount/E.cs.length*100):0)+'%) · экватор '+T.toFixed(0)+'°C'+
+  (S.growMul<1?' · <span style="color:#f0c060">засуха</span>':S.growMul>1?' · <span style="color:#9fe0a8">благодать</span>':'')+(S.dust>0.5?' · <span style="color:#f0a060">пыльная зима</span>':'');
+ $('simspeed').textContent=speed===0?'пауза':dps.toFixed(1)+' дн/сек';
+}
+const GROUPS=[['Тело',['size','speed','life','fert','hue']],['Оружие и защита',['attack','armor','venom','camo']],['Чувства и ум',['sense','night','intel']],['Поведение',['diet','social','aggr','fear','rot']],['Среда',['topt','ttol','swim','fly','dig']],['Наследственность',['mut']]];
+const GATE={venom:'venom',armor:'shell',camo:'chroma',night:'eyes',intel:'brain',swim:'fins',fly:'wings',dig:'claws',rot:'stomach'};
+function playerSpecies(){return S.species.filter(s=>s.player&&s.count>0).sort((a,b)=>b.count-a.count);}
+function renderMine(){
+ const list=playerSpecies();
+ $('ep').textContent='очки эволюции: '+Math.floor(S.ep);
+ if(!list.length){$('mine').innerHTML='<span style="color:#ff8a8a">Твоя линия вымерла.</span> <span class="muted">Можно наблюдать дальше или сотворить новый мир.</span>';return;}
+ if(!list.find(s=>s.id===mySp))mySp=list[0].id;
+ const sp=S.species[mySp],st=E.speciesStats(mySp);
+ let h='<div class="row" style="margin-bottom:6px">';
+ if(list.length>1){h+='<select id="mySel" style="background:#0f1218;color:#fff;border:1px solid #2f3646;border-radius:6px;padding:3px;max-width:100%">'+list.map(s=>'<option value="'+s.id+'"'+(s.id===mySp?' selected':'')+'>'+s.name+' ('+s.count+')</option>').join('')+'</select>';}
+ h+='</div><div><span class="dot" style="background:'+sp.col+'"></span><b>'+sp.name+'</b> · '+st.n+' особей · '+dietName(st.avg[G.diet])+' · поколение ≈'+st.gen.toFixed(0)+'</div>';
+ h+='<div class="muted small">В твоей линии '+list.length+' '+plural(list.length,'вид','вида','видов')+'. Мутация признака: 5 очков, новый орган: '+E.moduleCost(0)+'. Очки копятся от численности линии и новых видов.</div>';
+ h+='<div class="genes" id="genes">';
+ for(const[gname,keys]of GROUPS){h+='<div class="grp">'+gname+'</div>';
+  for(const k of keys){const gi=G[k],v=st.avg[gi];let warn='';
+   if(GATE[k]){const mk=E.MODS.findIndex(m=>m.k===GATE[k]);if(st.mc[mk]*2<st.n)warn=' <span class="warn" title="без органа «'+E.MODS[mk].ru+'» признак работает слабо">⚠</span>';}
+   const bar=k==='hue'?'<div class="bar"><i style="width:100%;background:hsl('+(v*360).toFixed(0)+',70%,55%)"></i></div>':'<div class="bar"><i style="width:'+(v*100).toFixed(0)+'%"></i></div>';
+   h+='<div>'+E.GENE_RU[k]+warn+'</div>'+bar+'<button data-g="'+gi+'" data-d="-1" '+(S.ep<5?'disabled':'')+'>−</button><button data-g="'+gi+'" data-d="1" '+(S.ep<5?'disabled':'')+'>+</button>';}}
+ h+='</div><div class="grp muted small" style="margin-top:8px;text-transform:uppercase;letter-spacing:.06em">Органы</div><div class="mods">';
+ E.MODS.forEach((m,k)=>{const share=st.n?st.mc[k]/st.n:0;const has=share>=0.5;
+  h+='<div title="'+m.hint+'">'+m.ru+' <span class="muted small">'+(share>0?Math.round(share*100)+'%':'')+'</span></div>'+
+  (has?'<button data-rm="'+k+'" '+(S.ep<10?'disabled':'')+'>убрать (10)</button>':'<button data-mod="'+k+'" '+(S.ep<E.moduleCost(k)?'disabled':'')+'>вырастить</button>');});
+ h+='</div>';
+ $('mine').innerHTML=h;
+ const sel=$('mySel');if(sel)sel.onchange=()=>{mySp=+sel.value;selSp=mySp;renderMine();};
+}
+function plural(n,a,b,c){n=Math.abs(n)%100;const n1=n%10;if(n>10&&n<20)return c;if(n1>1&&n1<5)return b;if(n1===1)return a;return c;}
+$('mine').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.dataset.g){if(E.nudgeGene(mySp,+b.dataset.g,+b.dataset.d))renderMine();}
+ else if(b.dataset.mod){if(E.grantModule(mySp,+b.dataset.mod))renderMine();}
+ else if(b.dataset.rm){if(E.removeModule(mySp,+b.dataset.rm))renderMine();}
+});
+function renderSpecies(){
+ const live=S.species.filter(s=>s.count>=3||(s.player&&s.count>0)).sort((a,b)=>b.count-a.count).slice(0,14);
+ $('splist').innerHTML='<tr class="muted small"><td>вид</td><td>особей</td><td>питание</td><td>возраст</td></tr>'+live.map(s=>'<tr class="sp'+(s.id===selSp?' sel':'')+'" data-id="'+s.id+'"><td><span class="dot" style="background:'+s.col+'"></span>'+(s.player?'★ ':'')+s.name+'</td><td>'+s.count+'</td><td class="muted">'+dietName(S.species[s.id].ref[G.diet])+'</td><td class="muted">'+(S.day-s.born)+' дн</td></tr>').join('');
+}
+$('splist').addEventListener('click',e=>{const tr=e.target.closest('tr.sp');if(!tr)return;const id=+tr.dataset.id;selSp=selSp===id?-1:id;if(S.species[id].player){mySp=id;renderMine();}renderSpecies();});
+
+function renderGraph(){
+ const c=$('graph'),w=c.clientWidth;c.width=w*dpr;const h=150;c.height=h*dpr;const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+ g.fillStyle='#10131a';g.fillRect(0,0,w,h);
+ const ht=S.histTotal;if(ht.length<2){g.fillStyle='#6d7689';g.fillText('Данные появятся через пару дней',10,20);return;}
+ const d0=Math.max(0,S.day-200),d1=Math.max(S.day,d0+5);
+ let ymax=1;for(const[d,v]of ht)if(d>=d0&&v>ymax)ymax=v;
+ const X=d=>8+(d-d0)/(d1-d0)*(w-16),Y=v=>h-14-v/ymax*(h-24);
+ g.strokeStyle='#222836';g.lineWidth=1;for(let k=0;k<=4;k++){const y=Y(ymax*k/4);g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
+ g.fillStyle='#6d7689';g.font='10px system-ui';g.fillText(ymax,4,10);g.fillText('день '+d0,4,h-3);g.fillText('день '+S.day,w-50,h-3);
+ const line=(arr,col,lw)=>{g.strokeStyle=col;g.lineWidth=lw;g.beginPath();let st=false;for(const[d,v]of arr){if(d<d0)continue;if(!st){g.moveTo(X(d),Y(v));st=true;}else g.lineTo(X(d),Y(v));}g.stroke();};
+ line(ht,'#5b6476',1.5);
+ const top=S.species.filter(s=>s.count>0&&!s.player).sort((a,b)=>b.count-a.count).slice(0,6);
+ for(const s of top)line(s.hist,s.col,1.3);
+ for(const s of S.species.filter(s=>s.player&&s.count>0).sort((a,b)=>b.count-a.count).slice(0,3))line(s.hist,s.col,1.2);
+ line(S.histPlayer,'#ffffff',2.2);
+}
+let treeRows=[];
+function renderTree(){
+ const c=$('tree'),w=c.clientWidth;
+ let vis=S.species.filter(s=>s.peak>=10||s.parent<0);
+ if(vis.length>160){const keep=new Set(vis.filter(s=>s.parent<0||s.count>0).map(s=>s.id));vis.sort((a,b)=>b.peak-a.peak);vis=vis.filter((s,i)=>i<160||keep.has(s.id));}
+ const visSet=new Set(vis.map(s=>s.id));
+ const vParent=s=>{let p=s.parent;while(p>=0&&!visSet.has(p))p=S.species[p].parent;return p;};
+ const kids={};const roots=[];
+ for(const s of vis){const p=vParent(s);if(p<0)roots.push(s);else(kids[p]=kids[p]||[]).push(s);}
+ treeRows=[];const rowOf={};
+ const dfs=s=>{rowOf[s.id]=treeRows.length;treeRows.push(s);(kids[s.id]||[]).sort((a,b)=>a.born-b.born).forEach(dfs);};
+ roots.sort((a,b)=>(b.player-a.player)||a.id-b.id).forEach(dfs);
+ const rh=treeRows.length>80?5:8,h=Math.max(120,treeRows.length*rh+20);
+ c.style.height=h+'px';c.width=w*dpr;c.height=h*dpr;const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+ g.fillStyle='#10131a';g.fillRect(0,0,w,h);
+ const now=Math.max(S.day,1),X=d=>10+d/now*(w-20),Y=r=>10+r*rh;
+ for(const s of treeRows){const r=rowOf[s.id],y=Y(r),end=s.died>=0?s.died:S.day;
+  const p=vParent(s);
+  g.globalAlpha=s.count>0?1:0.4;
+  if(p>=0){g.strokeStyle=s.col;g.lineWidth=1;g.beginPath();g.moveTo(X(s.born),Y(rowOf[p]));g.lineTo(X(s.born),y);g.stroke();}
+  g.strokeStyle=s.col;g.lineWidth=s.count>0?Math.min(rh-1,1+Math.log10(s.count+1)*1.6):1.2;
+  g.beginPath();g.moveTo(X(s.born),y);g.lineTo(Math.max(X(end),X(s.born)+1.5),y);g.stroke();
+  if(s.player){g.fillStyle='#fff';g.fillRect(X(s.born)-1.5,y-1.5,3,3);}
+  if(s.id===selSp){g.strokeStyle='#ffe070';g.lineWidth=1;g.strokeRect(X(s.born)-3,y-rh/2,X(end)-X(s.born)+6,rh);}
+ }
+ g.globalAlpha=1;
+ c.onclick=e=>{const r=c.getBoundingClientRect();const row=Math.round((e.clientY-r.top-10)/rh);const s=treeRows[row];if(s){selSp=s.id;if(s.player&&s.count>0){mySp=s.id;renderMine();}renderSpecies();showSpeciesInfo(s);}};
+}
+function showSpeciesInfo(s){
+ const p=s.parent>=0?S.species[s.parent]:null;
+ toast('«'+s.name+'»'+(s.player?' (твоя линия)':'')+': '+(s.count>0?s.count+' особей':'вымер на '+s.died+'-й день')+(p?'. Предок: «'+p.name+'»'+(s.desc?' ('+s.desc+')':''):'. Изначальный вид')+'. Пик: '+s.peak+'.','epoch');
+}
+function renderLog(){
+ if(!logDirty)return;logDirty=false;
+ $('log').innerHTML=S.log.slice(-90).reverse().map(l=>'<div class="t-'+l.type+'"><span class="d">д'+l.d+'</span>'+esc(l.text)+'</div>').join('');
+}
+function esc(t){return t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function bar(v,col){return'<div class="bar" style="width:110px;display:inline-block;vertical-align:middle"><i style="width:'+Math.max(0,Math.min(100,v*100)).toFixed(0)+'%;background:'+(col||'#5a8fd8')+'"></i></div>';}
+let lastDead=null;
+function renderInsp(){
+ const el=$('insp');
+ if(!selC){el.innerHTML=lastDead?'<span class="muted">Выбранное существо погибло: '+lastDead+'.</span>':'<span class="muted">Кликни по существу на карте.</span>';return;}
+ const c=selC,s=S.species[c.sp];
+ const T=E.tempAt(c.x,c.y);
+ const mods=E.MODS.filter((m,k)=>c.m&(1<<k)).map(m=>'<span class="chip" title="'+m.hint+'">'+m.ru+'</span>').join('')||'<span class="muted small">нет</span>';
+ const tr=[['Размер',c.g[G.size]],['Скорость',c.maxSpd/1.6],['Зрение',c.g[G.sense]],['Броня',c.armorE],['Атака',c.atk/1.5],['Яд',c.venomE],['Маскировка',c.camoE],['Хищность',c.diet],['Стайность',c.social],['Интеллект',c.intelE],['Плавание',c.swimE],['Полёт',c.flyE],['Рытьё',c.digE]];
+ el.innerHTML='<div><span class="dot" style="background:'+s.col+'"></span><b>'+s.name+'</b>'+(s.player?' <span style="color:#9fe0a8">★ твоя линия</span>':'')+'</div>'+
+ '<div class="muted small">особь #'+c.id+' · поколение '+c.gen+' · возраст '+(c.age/E.DAY).toFixed(1)+' из ~'+(c.life/E.DAY).toFixed(0)+' дн · убийств: '+c.kills+'</div>'+
+ '<div style="margin:4px 0">Сейчас: <b>'+(c.state||'—')+'</b>'+(c.sick>0?' · <span style="color:#a0ff60">болен</span>':'')+(c.poison>0.05?' · <span style="color:#c6a6ff">отравлен</span>':'')+'</div>'+
+ '<table><tr><td>Энергия</td><td>'+bar(c.energy/c.maxE,'#e0b040')+'</td></tr><tr><td>Здоровье</td><td>'+bar(c.hp/c.maxHp,'#5fbf6a')+'</td></tr>'+
+ tr.map(([n,v])=>'<tr><td>'+n+'</td><td>'+bar(v)+'</td></tr>').join('')+'</table>'+
+ '<div class="small" style="margin-top:4px">Комфорт: '+c.tLo.toFixed(0)+'…'+c.tHi.toFixed(0)+'°C, здесь '+T.toFixed(0)+'°C · '+E.BIOME_NAMES[S.biome[c.ti]]+'</div>'+
+ '<div class="small" style="margin-top:4px">Органы: '+mods+'</div>'+
+ '<div class="row" style="margin-top:6px"><button id="bFollow" class="'+(follow?'on':'')+'">'+(follow?'Не следить':'Следить (F)')+'</button></div>';
+ $('bFollow').onclick=()=>{follow=!follow;renderInsp();};
+}
+function updatePanels(){renderMine();renderSpecies();renderGraph();renderTree();renderLog();renderInsp();
+ $('worldinfo').textContent='Зерно '+S.seed+' · родилось '+S.births+' · крупных мутаций '+S.macros+' · всего видов за историю '+S.species.length;}
+
+/* loop */
+function loop(){
+ if(running&&speed>0){
+  const t0=performance.now(),budget=speed>=100?70:speed>=30?45:speed>=10?30:16;let n=0;const d0=S.day;
+  while(n<speed&&performance.now()-t0<budget){E.step();n++;}
+  simDays+=n/E.DAY;
+ }
+ const now=performance.now();if(now-simT0>1000){dps=simDays/((now-simT0)/1000);simDays=0;simT0=now;}
+ if(selC&&selC.dead){lastDead=selC.cause||'неизвестно';selC=null;follow=false;renderInsp();}
+ if(follow&&selC){cam.x+=(selC.x-W/2/cam.z-cam.x)*0.2;cam.y+=(selC.y-H/2/cam.z-cam.y)*0.2;}
+ if(frame%12===0||S.terrainDirty){drawTerrain();S.terrainDirty=false;}
+ if(speed<100||frame%3===0||!running)render();
+ if(frame%6===0)hud();
+ if(frame%30===0&&running){updatePanels();checkEnd();}
+ else if(frame%6===0&&selC)renderInsp();
+ frame++;requestAnimationFrame(loop);
+}
+function checkEnd(){
+ if(S.lost&&!lostShown){lostShown=true;setSpeed(0);$('o2t').textContent='Твоя линия вымерла';$('o2d').textContent='Это случилось на '+(Math.floor(S.day/E.YEAR_DAYS)+1)+'-й год. Мир продолжает жить без тебя: можно понаблюдать, кто победил, или начать заново.';$('over2').classList.remove('hidden');}
+ if(S.won&&!wonShown){wonShown=true;}
+}
+
+/* start / save */
+let pickedDiet=0.12;
+$('dietPick').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;pickedDiet=+b.dataset.d;document.querySelectorAll('#dietPick button').forEach(x=>x.classList.toggle('on',x===b));});
+$('cap').oninput=()=>$('capV').textContent=$('cap').value;$('ai').oninput=()=>$('aiV').textContent=$('ai').value;
+$('seed').value=Math.floor(Math.random()*1e6);
+function hasSave(){try{return!!localStorage.getItem(SAVE_KEY);}catch(e){return false;}}
+function openStart(canClose){$('overlay').classList.remove('hidden');$('bCont').classList.toggle('hidden',!hasSave());$('bClose').classList.toggle('hidden',!canClose);$('seed').value=Math.floor(Math.random()*1e6);}
+function afterLoad(){running=true;lostShown=S.lost;wonShown=S.won;selC=null;selSp=-1;follow=false;lastDead=null;logDirty=true;const l=playerSpecies();mySp=l.length?l[0].id:0;fit();drawTerrain();updatePanels();$('overlay').classList.add('hidden');$('over2').classList.add('hidden');setSpeed(1);}
+$('bStart').onclick=()=>{E.newGame({seed:+$('seed').value||1,cap:+$('cap').value,ai:+$('ai').value,playerDiet:pickedDiet});afterLoad();};
+$('bClose').onclick=()=>$('overlay').classList.add('hidden');
+$('bNew').onclick=()=>{setSpeed(0);openStart(true);};
+$('bNew2').onclick=()=>{$('over2').classList.add('hidden');openStart(false);};
+$('bWatch').onclick=()=>{$('over2').classList.add('hidden');setSpeed(1);};
+function loadStr(str){try{E.deserialize(str);afterLoad();toast('Мир загружен: '+fmtDay(S.day),'good');}catch(e){toast('Не удалось загрузить сохранение: '+e.message,'bad');}}
+$('bCont').onclick=()=>{try{loadStr(localStorage.getItem(SAVE_KEY));}catch(e){toast('Сохранение недоступно','bad');}};
+$('bSave').onclick=()=>{try{localStorage.setItem(SAVE_KEY,E.serialize());toast('Мир сохранён в браузере ('+fmtDay(S.day)+')','good');}catch(e){toast('Браузер не дал сохранить (мало места или запрет). Используй «Скачать файл».','bad');}};
+$('bLoad').onclick=()=>{if(!hasSave()){toast('Сохранений в браузере нет','bad');return;}loadStr(localStorage.getItem(SAVE_KEY));};
+$('bDown').onclick=()=>{let txt;try{txt=E.serialize();}catch(e){toast('Ошибка сохранения','bad');return;}
+ try{navigator.clipboard.writeText(txt).then(()=>toast('Сохранение скопировано. Вставь его в текстовый файл и сохрани как .json, потом его можно открыть кнопкой «Открыть файл».','good'),()=>toast('Браузер не дал скопировать. Используй «Сохранить».','bad'));}catch(e){toast('Браузер не дал скопировать. Используй «Сохранить».','bad');}};
+$('bUp').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>loadStr(r.result);r.readAsText(f);e.target.value='';};
+
+resize();
+E.newGame({seed:1,cap:1000,ai:4});fit();drawTerrain();
+openStart(false);
+requestAnimationFrame(loop);
+})();
+
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@ const cv=$('cv');let ctx=cv.getContext('2d');let NOCA=false;
 const far=document.createElement('canvas'),fctx=far.getContext('2d');
 const near=document.createElement('canvas'),nctx=near.getContext('2d');
 let W=1,H=1,DPR=1;
-function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);far.width=Math.max(8,Math.ceil(W/8));far.height=Math.max(8,Math.ceil(H/8));near.width=Math.max(4,Math.ceil(W/14));near.height=Math.max(4,Math.ceil(H/14));}
+function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);cv.style.width=W+'px';cv.style.height=H+'px';far.width=Math.max(8,Math.ceil(W/8));far.height=Math.max(8,Math.ceil(H/8));near.width=Math.max(4,Math.ceil(W/14));near.height=Math.max(4,Math.ceil(H/14));}
 addEventListener('resize',resize);resize();
 
 /* ========== константы ========== */
@@ -189,9 +189,9 @@ addEventListener('keydown',e=>{
  if(e.target.tagName==='INPUT')return;
  keys[e.code]=true;
  if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))lastInput='keys';
- if(e.code==='KeyE'){toggleEditor();e.preventDefault();}
+ if(e.code==='KeyE'&&!setOpen){toggleEditor();e.preventDefault();}
  if(e.code==='Space'){doDash();e.preventDefault();}
- if(e.code==='KeyP'||e.code==='Escape'){if(editorOpen)toggleEditor();else if(started)setPause(!paused);}
+ if(e.code==='KeyP'||e.code==='Escape'){if(setOpen)toggleSettings();else if(editorOpen)toggleEditor();else if(started)setPause(!paused);}
  const mi=['Digit1','Digit2','Digit3','Digit4'].indexOf(e.code);if(mi>=0&&!editorOpen)setMode(MODE_KEYS[mi]);
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -379,7 +379,7 @@ function caOff(wx,wy){const sx=(wx-cam.x)*cam.s,sy=(wy-cam.y)*cam.s;const k=2.6/
 function mem(path,wx,wy,ang,a,wMul,colFn){
  const lw=ST.memW*(wMul||1)*PX;
  if(ST.halo){ctx.strokeStyle=ST.halo(a);ctx.lineWidth=lw*4;path();ctx.stroke();}
- const[ox,oy]=NOCA?[0,0]:caOff(wx,wy);
+ const[ox,oy]=(NOCA||!FX.ca)?[0,0]:caOff(wx,wy);
  if(ox*ox+oy*oy>(0.45*PX)**2){const c=Math.cos(-ang),s=Math.sin(-ang),lx=ox*c-oy*s,ly=ox*s+oy*c;ctx.lineWidth=lw*1.1;
   ctx.translate(lx,ly);ctx.strokeStyle=ST.caR(a);path();ctx.stroke();ctx.translate(-2*lx,-2*ly);ctx.strokeStyle=ST.caB(a);path();ctx.stroke();ctx.translate(lx,ly);}
  ctx.strokeStyle=colFn?colFn(a):ST.mem(a);ctx.lineWidth=lw;path();ctx.stroke();
@@ -570,6 +570,7 @@ function bg(){
  const ed=Math.hypot(cam.x,cam.y)+Math.hypot(W,H)/2/cam.s;if(ed>DROP_R*0.9){const sx=-cam.x*cam.s+W/2,sy=-cam.y*cam.s+H/2;ctx.lineWidth=60*cam.s;ctx.strokeStyle=ST.dark?'rgba(200,220,255,0.12)':'rgba(60,50,30,0.3)';ctx.beginPath();ctx.arc(sx,sy,DROP_R*cam.s+30*cam.s,0,TAU);ctx.stroke();}
 }
 function drawFar(){
+ if(!FX.blur)return;
  const fw=far.width,fh=far.height;fctx.setTransform(1,0,0,1,0,0);fctx.clearRect(0,0,fw,fh);
  const span=viewD()*2.2,par=0.55;
  for(const o of farObj){o.a+=o.v;let x=((o.x*span-cam.x*par)%span+span)%span-span*0.3,y=((o.y*span-cam.y*par)%span+span)%span-span*0.3;
@@ -582,6 +583,7 @@ function drawFar(){
  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.imageSmoothingEnabled=true;ctx.globalAlpha=ST.dark?0.4:0.38;ctx.drawImage(far,0,0,W,H);ctx.globalAlpha=1;
 }
 function drawNear(){
+ if(!FX.blur)return;
  const nw=near.width,nh=near.height;nctx.setTransform(1,0,0,1,0,0);nctx.clearRect(0,0,nw,nh);
  const span=viewD()*1.6,par=1.6;
  for(const o of nearObj){const x=((o.x*span-cam.x*par)%span+span)%span,y=((o.y*span-cam.y*par)%span+span)%span;const sx=x/span*nw*1.4-nw*0.2,sy=y/span*nh*1.4-nh*0.2,sr=o.r*nw;
@@ -590,6 +592,7 @@ function drawNear(){
  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.imageSmoothingEnabled=true;ctx.drawImage(near,0,0,W,H);
 }
 function drawParticles(dt){
+ if(!FX.parts)return;
  const hw=W/2/cam.s,hh=H/2/cam.s;
  ctx.setTransform(DPR,0,0,DPR,0,0);
  for(const p of parts){
@@ -628,9 +631,9 @@ function drawWorld(){
 }
 function drawOverlay(){
  ctx.setTransform(DPR,0,0,DPR,0,0);
- const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.hypot(W,H)*0.55);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,ST.vig);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ if(FX.vig){const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.hypot(W,H)*0.55);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,ST.vig);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
  // цветная кайма по краю поля
- const r0=Math.min(W,H)*0.48,rg=ctx.createRadialGradient(W/2,H/2,r0,W/2,H/2,Math.hypot(W,H)*0.55);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(0.35,ST.dark?'rgba(80,40,255,0.07)':'rgba(255,60,0,0.06)');rg.addColorStop(0.7,ST.dark?'rgba(255,60,40,0.06)':'rgba(0,80,255,0.05)');rg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=rg;ctx.fillRect(0,0,W,H);
+ if(FX.ca){const r0=Math.min(W,H)*0.48,rg=ctx.createRadialGradient(W/2,H/2,r0,W/2,H/2,Math.hypot(W,H)*0.55);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(0.35,ST.dark?'rgba(80,40,255,0.07)':'rgba(255,60,0,0.06)');rg.addColorStop(0.7,ST.dark?'rgba(255,60,40,0.06)':'rgba(0,80,255,0.05)');rg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=rg;ctx.fillRect(0,0,W,H);}
  if(cam.trans>0){const a=Math.sin(cam.trans*Math.PI)*0.85;ctx.fillStyle=ST.bg0;ctx.globalAlpha=a;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
  // стрелки угроз (глазок) и еды (хемотаксис)
  const arrows=[];
@@ -655,8 +658,18 @@ function updateCam(dt){
 
 /* ========== HUD ========== */
 const MODE_BTNS={};
-MODE_KEYS.forEach((k,i)=>{const b=document.createElement('button');b.textContent=(i+1)+' · '+MODES[k].ru;b.onclick=()=>setMode(k);$('modeBtns').appendChild(b);MODE_BTNS[k]=b;});
+const MODE_DESC={bright:'Классика: свет сквозь прозрачные клетки',dark:'Чёрный фон, светятся контуры и реснички',phase:'Видно органеллы, светлые ореолы',fluo:'Ядра синие, хлорофилл красный'};
+MODE_KEYS.forEach((k,i)=>{const b=document.createElement('button');b.innerHTML='<b>'+(i+1)+' · '+MODES[k].ru+'</b><span>'+MODE_DESC[k]+'</span>';b.onclick=()=>setMode(k);$('modeBtns').appendChild(b);MODE_BTNS[k]=b;});
 function setMode(k){P.mode=k;ST=MODES[k];if(!ST.cytoP)ST.cytoP=(h,a)=>ST.cyto(h,a);for(const kk of MODE_KEYS)MODE_BTNS[kk].classList.toggle('on',kk===k);if(editorOpen)drawEditor();}
+const FX_KEY='evo_stage1_fx';const FX={blur:true,ca:true,parts:true,vig:true};
+try{Object.assign(FX,JSON.parse(localStorage.getItem(FX_KEY)||'{}'));}catch(e){}
+const FX_RU={blur:'Размытые слои вне фокуса',ca:'Цветная кайма у краёв (хроматическая аберрация)',parts:'Броуновские частицы',vig:'Затемнение краёв поля (виньетка)'};
+function renderFx(){$('fxToggles').innerHTML=Object.keys(FX_RU).map(k=>'<label class="tog"><input type="checkbox" data-fx="'+k+'" '+(FX[k]?'checked':'')+'>'+FX_RU[k]+'</label>').join('');}
+renderFx();
+$('fxToggles').addEventListener('change',e=>{const k=e.target.dataset.fx;if(!k)return;FX[k]=e.target.checked;try{localStorage.setItem(FX_KEY,JSON.stringify(FX));}catch(err){}});
+let setOpen=false,wasPaused=false;
+function toggleSettings(){if(editorOpen)return;setOpen=!setOpen;$('settings').classList.toggle('hidden',!setOpen);if(setOpen){wasPaused=paused;paused=true;$('pause').classList.add('hidden');}else paused=started?wasPaused:true;}
+$('bSet').onclick=toggleSettings;$('sClose').onclick=toggleSettings;
 for(const k of MODE_KEYS){const m=MODES[k];m.cytoP=k==='bright'?(h,a)=>`hsla(${h},45%,55%,${a*0.22})`:k==='phase'?(h,a)=>`hsla(${h},14%,32%,${a*0.33})`:k==='dark'?(h,a)=>`hsla(${h},45%,70%,${a*0.09})`:(h,a)=>`hsla(${h},100%,55%,${a*0.07})`;}
 function niceLen(v){const c=[1,2,5,10,20,25,50,100,200,250,500,1000];let b=c[0];for(const x of c)if(x<=v)b=x;return b;}
 let hudT=0;
@@ -795,8 +808,8 @@ function setPause(v,silent){paused=v;$('pause').classList.toggle('hidden',!v||!!
 $('bResume').onclick=()=>setPause(false);
 $('bEdit').onclick=toggleEditor;$('tEdit').onclick=toggleEditor;$('bDash').onclick=doDash;$('tDash').onclick=doDash;
 function begin(fresh){
- if(fresh||!load()){P=newPlayer();cam.obj=0;}
- started=true;derive();setMode(P.mode||'bright');initWorld();P.inv=Math.max(P.inv,4);
+ let isNew=false;if(fresh||!load()){P=newPlayer();cam.obj=0;isNew=true;}
+ started=true;derive();if(isNew)P.hp=D.hpMax;setMode(P.mode||'bright');initWorld();P.inv=Math.max(P.inv,4);
  ents=ents.filter(e=>{const s=SP[e.sp];if(!s||s.kind==='food')return true;return Math.hypot(e.x-P.x,e.y-P.y)>viewD()*1.3||(!s.dmg&&s.beh!=='amoeba');});cam.x=P.x;cam.y=P.y;cam.s=Math.min(W,H)/OBJ[cam.obj].d;
  $('start').classList.add('hidden');paused=false;
  if(fresh)toast('Ты — одна клетка в капле прудовой воды. <b>Ешь, делись, эволюционируй.</b>');

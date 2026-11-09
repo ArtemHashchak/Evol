@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#e8ecf2;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
-#cv{position:fixed;inset:0;display:block;touch-action:none;cursor:crosshair}
+#cv{position:fixed;left:0;top:0;width:100vw;height:100vh;display:block;touch-action:none;cursor:crosshair}
 .panel{background:rgba(14,17,24,.78);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 11px;backdrop-filter:blur(4px)}
 #hud{position:fixed;left:10px;top:10px;width:250px}
 #hud .t{font-weight:600;margin-bottom:4px}
@@ -20,10 +20,12 @@ button:hover{border-color:#6a7a9a;background:#2b3446}
 button.on{background:#2f5a9a;border-color:#5a8ad0}
 button:disabled{opacity:.4;cursor:default}
 #hudBtns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-#modes{position:fixed;right:10px;top:10px;text-align:right}
-#modes .row{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
-#modes button{font-size:12px;padding:4px 8px}
-#obj{margin-top:6px;font-size:12px;color:#c4cad6}
+#obj{font-size:12px;margin-top:2px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modes button{text-align:left;padding:9px 11px;border-radius:10px}
+.modes button b{display:block;font-size:14px}.modes button span{font-size:12px;color:#a8b0c0}
+.tog{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #222a38;cursor:pointer;font-size:13px}
+.tog input{width:16px;height:16px}
 #scale{position:fixed;left:14px;bottom:14px;color:#fff;font-size:12px;text-shadow:0 0 3px #000,0 0 6px #000}
 #sbLine{height:4px;background:#fff;box-shadow:0 0 3px #000;margin-bottom:3px}
 #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);max-width:min(620px,70vw);text-align:center;font-size:13px}
@@ -62,7 +64,7 @@ button:disabled{opacity:.4;cursor:default}
 #touch{position:fixed;right:12px;bottom:70px;display:none;flex-direction:column;gap:10px}
 #touch button{width:62px;height:62px;border-radius:50%;font-size:12px}
 @media (pointer:coarse){#touch{display:flex}#hint{bottom:90px}}
-@media (max-width:760px){#hud{width:190px;font-size:12px}#goal{display:none}.ecols{grid-template-columns:1fr}.cards{grid-template-columns:1fr}#ecv{height:42vh}.tree{max-height:none}#modes button{padding:3px 6px;font-size:11px}}
+@media (max-width:760px){#hud{width:190px;font-size:12px}#goal{display:none}.ecols{grid-template-columns:1fr}.cards{grid-template-columns:1fr}#ecv{height:42vh}.tree{max-height:none}.modes{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -72,13 +74,9 @@ button:disabled{opacity:.4;cursor:default}
  <div class="lbl"><span>Здоровье</span><span id="hpTxt"></span></div><div class="bar"><i id="hpBar"></i></div>
  <div class="lbl"><span id="bmLbl">Биомасса</span><span id="bmTxt"></span></div><div class="bar"><i id="bmBar"></i></div>
  <div class="lbl"><span>Клеток: <b id="cellTxt">1</b> / 30</span><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span></div>
- <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
 </div>
-<div id="modes" class="panel">
- <div class="row" id="modeBtns"></div>
- <div id="obj"></div>
-</div>
-<div id="scale"><div id="sbLine"></div><span id="sbText"></span></div>
+<div id="scale"><div id="sbLine"></div><span id="sbText"></span><div id="obj"></div></div>
 <div id="toasts"></div>
 <div id="hint" class="panel"></div>
 <div id="goal" class="panel"></div>
@@ -113,6 +111,14 @@ button:disabled{opacity:.4;cursor:default}
 </div></div>
 
 <div id="final" class="modal hidden"><div class="box" style="max-width:860px" id="finalBox"></div></div>
+<div id="settings" class="modal hidden"><div class="box" style="max-width:560px">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">Настройки</h2><button class="on" id="sClose">Готово</button></div>
+ <div class="grp" style="margin-top:0">Метод микроскопии (клавиши 1–4)</div>
+ <div class="modes" id="modeBtns"></div>
+ <div class="grp" style="margin-top:14px">Эффекты микроскопа</div>
+ <div id="fxToggles"></div>
+ <div class="small muted" style="margin-top:8px">Если игра тормозит, отключи размытие и частицы.</div>
+</div></div>
 <div id="pause" class="modal hidden"><div class="box" style="max-width:360px;text-align:center"><h2>Пауза</h2><button class="on" id="bResume">Продолжить</button></div></div>
 <script>
 /*GAME*/

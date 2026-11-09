@@ -387,7 +387,7 @@ function updatePlayer(dt){
  const fx=Math.cos(P.a),fy=Math.sin(P.a);
  let face=1;if(thr>0){const da=Math.atan2(dy,dx);face=Math.max(0.2,Math.cos(((da-P.a+Math.PI*3)%TAU)-Math.PI));}
  let tv=D.speed*thr*face*(P.starving?0.7:1);if(P.dashT>0){P.dashT-=dt;tv=Math.max(tv,D.speed)*3.2;}
- const k=Math.min(1,dt*22);P.vx+=(fx*tv-P.vx)*k;P.vy+=(fy*tv-P.vy)*k;
+ const k=Math.min(1,dt*9);P.vx+=(fx*tv-P.vx)*k;P.vy+=(fy*tv-P.vy)*k;
  const fl=flow(P.x,P.y);P.x+=(P.vx+fl[0]*0.6)*dt;P.y+=(P.vy+fl[1]*0.6)*dt;
  const dc=Math.hypot(P.x,P.y);if(dc>DROP_R-D.R){P.x*=(DROP_R-D.R)/dc;P.y*=(DROP_R-D.R)/dc;}
  if(P.dashCd>0)P.dashCd-=dt;if(P.inv>0)P.inv-=dt;if(P.hurt>0)P.hurt-=dt;P.lastHit+=dt;
@@ -583,7 +583,7 @@ function updateEnts(dt){
   if(Math.hypot(e.x,e.y)>DROP_R*0.97){e.wa=Math.atan2(-e.y,-e.x);}
   if(e.div)spd*=0.15;if(e.conj)spd*=0.35;
   let tvx=Math.cos(e.a)*spd,tvy=Math.sin(e.a)*spd;if((e.sp==='paramecium'||e.sp==='euglena')&&!e.conj){const wv=Math.sin(e.t*3.2+e.seed*9)*spd*0.45;tvx+=-Math.sin(e.a)*wv;tvy+=Math.cos(e.a)*wv;e.spin=(e.spin||0)+dt*(spd>5?3.2:0.6);}
-  const kk=Math.min(1,dt*12);e.vx+=(tvx-e.vx)*kk;e.vy+=(tvy-e.vy)*kk;
+  const kk=Math.min(1,dt*7);e.vx+=(tvx-e.vx)*kk;e.vy+=(tvy-e.vy)*kk;
   const fk=s.beh==='sessile'?0:1;e.x+=(e.vx+fl[0]*fk)*dt;e.y+=(e.vy+fl[1]*fk)*dt;
   if(e.r>34&&s.beh!=='hydra'&&s.beh!=='sessile'&&s.beh!=='egg'){for(const t of thickets){const dd=Math.hypot(e.x-t.x,e.y-t.y);if(dd<t.r+e.r*0.8&&dd>1){const m=t.r+e.r*0.8-dd;e.x+=(e.x-t.x)/dd*m*0.5;e.y+=(e.y-t.y)/dd*m*0.5;if(s.spd)e.wa=Math.atan2(e.y-t.y,e.x-t.x);}}}
   if(e.sp==='volvox')e.spin=(e.spin||0)+dt*0.4;

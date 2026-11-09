@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Эволюция · Уровень 1: Капля</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#e8ecf2;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+#cv{position:fixed;inset:0;display:block;touch-action:none;cursor:crosshair}
+.panel{background:rgba(14,17,24,.78);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 11px;backdrop-filter:blur(4px)}
+#hud{position:fixed;left:10px;top:10px;width:250px}
+#hud .t{font-weight:600;margin-bottom:4px}
+.bar{height:7px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;margin:2px 0 5px}
+.bar i{display:block;height:100%;width:0;transition:width .2s}
+#hpBar{background:#5fd07a}#bmBar{background:#e0b84a}
+.lbl{display:flex;justify-content:space-between;font-size:12px;color:#c4cad6}
+button{background:#232a38;color:#e8ecf2;border:1px solid #3a4458;border-radius:7px;padding:5px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:#6a7a9a;background:#2b3446}
+button.on{background:#2f5a9a;border-color:#5a8ad0}
+button:disabled{opacity:.4;cursor:default}
+#hudBtns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+#modes{position:fixed;right:10px;top:10px;text-align:right}
+#modes .row{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+#modes button{font-size:12px;padding:4px 8px}
+#obj{margin-top:6px;font-size:12px;color:#c4cad6}
+#scale{position:fixed;left:14px;bottom:14px;color:#fff;font-size:12px;text-shadow:0 0 3px #000,0 0 6px #000}
+#sbLine{height:4px;background:#fff;box-shadow:0 0 3px #000;margin-bottom:3px}
+#hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);max-width:min(620px,70vw);text-align:center;font-size:13px}
+#toasts{position:fixed;left:50%;top:10px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(520px,60vw)}
+.toast{animation:fade 6s forwards;text-align:center}
+.toast b{color:#ffe08a}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
+#goal{position:fixed;right:10px;bottom:14px;width:250px;font-size:12px}
+.modal{position:fixed;inset:0;background:rgba(3,5,8,.82);display:flex;align-items:center;justify-content:center;z-index:20}
+.box{background:#141923;border:1px solid #2c3446;border-radius:14px;padding:20px 24px;max-width:min(980px,96vw);max-height:94vh;overflow:auto}
+.box h1{margin:0 0 6px;font-size:26px;font-weight:600}
+.box h2{margin:0 0 8px;font-size:18px;font-weight:600}
+.muted{color:#97a0b2}.small{font-size:12px}
+.hidden{display:none!important}
+#editor .box{width:min(1180px,98vw);padding:14px 16px}
+.ecols{display:grid;grid-template-columns:330px 1fr 270px;gap:14px}
+.tree{max-height:72vh;overflow:auto;padding-right:4px}
+.grp{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#8a94a8;margin:10px 0 4px}
+.node{display:block;width:100%;text-align:left;margin:3px 0;padding:6px 9px;border-radius:8px}
+.node .n{font-weight:600}.node .c{float:right;color:#ffd47a}
+.node .d{font-size:11.5px;color:#a8b0c0;margin-top:2px;line-height:1.35}
+.node.owned{border-color:#3f7a50;background:#1b2a20}.node.owned .c{color:#7fd08f}
+.node.locked{opacity:.5}
+#ecv{width:100%;height:min(62vh,560px);background:#000;border-radius:12px;display:block;cursor:pointer}
+.pal{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pal button{font-size:12px;padding:5px 6px;text-align:left;display:flex;gap:6px;align-items:center}
+.sw{width:12px;height:12px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.5)}
+.stat{display:flex;justify-content:space-between;font-size:12px;padding:1px 0;border-bottom:1px solid #222a38}
+#eInfo{min-height:38px;font-size:12px;color:#c9d0dc;margin-top:6px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.card{background:#1a2030;border:1px solid #2c3446;border-radius:12px;padding:12px;cursor:pointer}
+.card:hover{border-color:#6a8ad0}
+.card h3{margin:0 0 4px;font-size:16px}
+.meter{height:6px;border-radius:3px;background:#2a3244;overflow:hidden;margin:6px 0}
+.meter i{display:block;height:100%;background:#7fb0ff}
+#touch{position:fixed;right:12px;bottom:70px;display:none;flex-direction:column;gap:10px}
+#touch button{width:62px;height:62px;border-radius:50%;font-size:12px}
+@media (pointer:coarse){#touch{display:flex}#hint{bottom:90px}}
+@media (max-width:760px){#hud{width:190px;font-size:12px}#goal{display:none}.ecols{grid-template-columns:1fr}.cards{grid-template-columns:1fr}#ecv{height:42vh}.tree{max-height:none}#modes button{padding:3px 6px;font-size:11px}}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud" class="panel">
+ <div class="t" id="hTitle">Поколение 1</div>
+ <div class="lbl"><span>Здоровье</span><span id="hpTxt"></span></div><div class="bar"><i id="hpBar"></i></div>
+ <div class="lbl"><span id="bmLbl">Биомасса</span><span id="bmTxt"></span></div><div class="bar"><i id="bmBar"></i></div>
+ <div class="lbl"><span>Клеток: <b id="cellTxt">1</b> / 30</span><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
+</div>
+<div id="modes" class="panel">
+ <div class="row" id="modeBtns"></div>
+ <div id="obj"></div>
+</div>
+<div id="scale"><div id="sbLine"></div><span id="sbText"></span></div>
+<div id="toasts"></div>
+<div id="hint" class="panel"></div>
+<div id="goal" class="panel"></div>
+<div id="touch"><button id="tDash">Рывок</button><button id="tEdit">Эволюция</button></div>
+
+<div id="start" class="modal"><div class="box" style="max-width:560px">
+ <h1>Эволюция · Уровень 1</h1>
+ <div class="muted">Капля прудовой воды под микроскопом. Ты — одна-единственная клетка. Ешь, делись, открывай мутации и собери из клеток своё первое многоклеточное тело. Что получится на выходе — животное, растение или гриб — решаешь ты.</div>
+ <div class="small muted" style="margin-top:10px">Управление: мышь (плыви за курсором) или WASD/стрелки, на телефоне веди пальцем. E — эволюция, Пробел — рывок, 1–4 — метод микроскопии, P — пауза.</div>
+ <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="on" id="bNew" style="padding:9px 18px;font-size:15px">Новая игра</button><button id="bCont" class="hidden" style="padding:9px 18px;font-size:15px">Продолжить</button></div>
+</div></div>
+
+<div id="editor" class="modal hidden"><div class="box">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+  <h2 style="margin:0">Эволюция</h2>
+  <div class="small"><span>Биомасса: <b id="eBm" style="color:#e0b84a"></b></span> · <span>ДНК: <b id="eDna" style="color:#ffd47a"></b></span></div>
+  <button id="eClose" class="on">Готово (E)</button>
+ </div>
+ <div class="ecols">
+  <div class="tree" id="tree"></div>
+  <div><canvas id="ecv"></canvas><div id="eInfo"></div></div>
+  <div>
+   <div class="grp" style="margin-top:0">Тип клетки</div>
+   <div class="pal" id="pal"></div>
+   <div class="grp">Окраска</div>
+   <input type="range" id="hue" min="0" max="359" style="width:100%">
+   <div class="pal" id="pats" style="margin-top:4px"></div>
+   <div class="grp">Тело</div>
+   <div id="stats"></div>
+  </div>
+ </div>
+</div></div>
+
+<div id="final" class="modal hidden"><div class="box" style="max-width:860px" id="finalBox"></div></div>
+<div id="pause" class="modal hidden"><div class="box" style="max-width:360px;text-align:center"><h2>Пауза</h2><button class="on" id="bResume">Продолжить</button></div></div>
+<script>
+/*GAME*/
+</script>
+</body>
+</html>

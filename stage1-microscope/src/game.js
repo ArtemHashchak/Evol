@@ -387,7 +387,7 @@ function updatePlayer(dt){
  const fx=Math.cos(P.a),fy=Math.sin(P.a);
  let face=1;if(thr>0){const da=Math.atan2(dy,dx);face=Math.max(0.2,Math.cos(((da-P.a+Math.PI*3)%TAU)-Math.PI));}
  let tv=D.speed*thr*face*(P.starving?0.7:1);if(P.dashT>0){P.dashT-=dt;tv=Math.max(tv,D.speed)*3.2;}
- const k=Math.min(1,dt*5);P.vx+=(fx*tv-P.vx)*k;P.vy+=(fy*tv-P.vy)*k;
+ const k=Math.min(1,dt*22);P.vx+=(fx*tv-P.vx)*k;P.vy+=(fy*tv-P.vy)*k;
  const fl=flow(P.x,P.y);P.x+=(P.vx+fl[0]*0.6)*dt;P.y+=(P.vy+fl[1]*0.6)*dt;
  const dc=Math.hypot(P.x,P.y);if(dc>DROP_R-D.R){P.x*=(DROP_R-D.R)/dc;P.y*=(DROP_R-D.R)/dc;}
  if(P.dashCd>0)P.dashCd-=dt;if(P.inv>0)P.inv-=dt;if(P.hurt>0)P.hurt-=dt;P.lastHit+=dt;
@@ -401,6 +401,7 @@ function updatePlayer(dt){
  for(const s of slime)s.t-=dt;slime=slime.filter(s=>s.t>0);
  if(D.sting){P.stingCd-=dt;if(P.stingCd<=0){fireSting();}}
  P.stats.time+=dt;P.stats.sinceDeath+=dt;
+ if(P.vacs){for(const v of P.vacs)v.t+=dt*(D.digest||1);P.vacs=P.vacs.filter(v=>v.t<v.dur);}
 }
 function gain(b,photo){
  const before=P.biomass;P.biomass+=b*(photo?1:D.digest);P.sat=Math.min(1,(P.sat==null?1:P.sat)+b*D.satGain*(photo?1.6:1));
@@ -433,7 +434,7 @@ function playerDie(){
  let newDef=null;if(R_()<0.25){const o=Object.keys(DEFECTS).filter(k=>!P.defects[k]);if(o.length){newDef=pick(o);P.defects[newDef]=2;}}
  derive();const lost=Math.round(P.biomass*0.3);P.biomass-=lost;
  const a=rnd(0,TAU);P.x+=Math.cos(a)*600;P.y+=Math.sin(a)*600;const dc=Math.hypot(P.x,P.y);if(dc>DROP_R*0.9){P.x*=DROP_R*0.9/dc;P.y*=DROP_R*0.9/dc;}
- P.hp=D.hpMax;P.inv=3;P.vx=P.vy=0;P.sat=Math.max(P.sat||0,0.6);
+ P.hp=D.hpMax;P.inv=3;P.vx=P.vy=0;P.vacs=[];P.sat=Math.max(P.sat||0,0.6);
  ents=ents.filter(e=>Math.hypot(e.x-P.x,e.y-P.y)>viewD()*0.5||(SP[e.sp]&&SP[e.sp].kind==='food'));
  cam.x=P.x;cam.y=P.y;
  if(window.__deaths)window.__deaths.push(deathCause);toast('Ты погиб'+(deathCause?' ('+deathCause+')':'')+'. Род продолжает потомок — <b>поколение '+P.gen+'</b>. Потеряно '+lost+' биомассы.');
@@ -450,12 +451,22 @@ function killEnt(e){
  const n=Math.max(2,Math.min(10,Math.round(s.food/3)));for(let i=0;i<n;i++){const d=spawnFood(e.x+rnd(-1,1)*e.r*0.6,e.y+rnd(-1,1)*e.r*0.6,'detritus',s.food/n*0.9);d.vx=rnd(-15,15);d.vy=rnd(-15,15);}
  if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);
 }
+function addVac(e){if(!D.cw||!D.cw.length)return;P.vacs=P.vacs||[];let bi=0,bd=1e9;for(let i=0;i<D.cw.length;i++){const w=D.cw[i];const d=Math.hypot(w.wx-e.x,w.wy-e.y);if(d<bd){bd=d;bi=i;}}
+ if(P.vacs.filter(v=>v.ci===bi).length>=3)bi=(R_()*D.cw.length)|0;const s=SP[e.sp];const fv=e.sp==='detritus'?e.food:(s?s.food:1);
+ P.vacs.push({ci:bi,ox:rnd(-1,1)*CELL_R*0.35,oy:rnd(-1,1)*CELL_R*0.35,sz:clamp(1.6+Math.sqrt(e.r)*0.9,2.2,CELL_R*0.5),k:e.sp,t:0,dur:clamp(3.5+fv*1.1,4.5,18)});if(P.vacs.length>45)P.vacs.shift();}
 function eatEnt(e){
  if(e.eaten)return;e.eaten=0.001;e.by=null;const s=SP[e.sp];
  if(e.sp==='plasmid'){P.dna+=1;pop(e.x,e.y,'+1 ДНК','#ffd47a');return;}
  if(e.sp==='kin'){return;}
+ addVac(e);
  const f=e.sp==='detritus'?e.food:s.food*(e.hp/e.maxHp*0.5+0.5);gain(f);P.stats.eaten++;
  if(s&&s.kind!=='food'){ecoHit(e.sp);P.killed[e.sp]=(P.killed[e.sp]||0)+1;if(e.sp==='egg')P.stats.eggs++;if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);pop(e.x,e.y+8,'+'+f.toFixed(0)+' биомассы','#e8c860');}
+}
+function finishDiv(e,s){
+ const type=e.div.type,r0=e.r;e.div=null;const k=type==='long'?0.95:e.sp==='amoeba'?0.72:0.6;const nr=r0*k;
+ const c=Math.cos(e.a),sn=Math.sin(e.a);let ox,oy;if(type==='long'){ox=-sn*r0*0.3;oy=c*r0*0.3;}else if(e.sp==='amoeba'){ox=-sn*r0*0.75;oy=c*r0*0.75;}else{ox=c*r0*0.5;oy=sn*r0*0.5;}
+ const b=spawnEnt(e.sp,e.x+ox,e.y+oy);b.a=b.wa=e.a+(type==='long'?0.25:0);b.grp=e.grp;b.r=nr;b.maxHp=s.hp*(nr/s.r[0])**1.2;b.hp=b.maxHp;b.growTo=r0;
+ e.x-=ox;e.y-=oy;e.a+=(type==='long'?-0.25:0);e.wa=e.a;e.r=nr;e.maxHp=b.maxHp;e.hp=e.maxHp;e.growTo=r0;e.prevHp=e.hp;
 }
 function steer(e,ang,dt,turn){let diff=((ang-e.a+Math.PI*3)%TAU)-Math.PI;const m=turn*dt;e.a+=clamp(diff,-m,m);}
 function updateEnts(dt){
@@ -494,6 +505,8 @@ function updateEnts(dt){
    if(dP<pR+e.r+45&&pslow&&!(e.aggro>0)&&allyCount<maxAllies()&&P.inv<=0){e.bond=(e.bond||0)+dt;if(e.bond>=3){e.ally=true;e.bond=0;allyCount++;pop(e.x,e.y-e.r-8,'Симбионт!','#ffd47a');if(!P.hintsDone.ally){P.hintsDone.ally=1;toast('<b>Симбиоз!</b> Эвглена теперь плавает с тобой и делится биомассой на свету. Береги её от хищников.');}}}
    else if(e.bond)e.bond=Math.max(0,e.bond-dt*0.6);
   }
+  if(e.conj){const c=e.conj,o=c.p;c.t-=dt;if(!o||o.dead||o.eaten||!o.conj||c.t<=0||(e.fleeT>0)){if(c.lead&&c.t<=0)lifePop(e,'Обмен генами завершён');e.conj=null;if(o&&o.conj&&o.conj.p===e)o.conj=null;e.wa=e.a+(c.lead?0.7:-0.7);e.r*=rnd(0.97,1.03);}
+   else if(!c.lead){const L=o;e.a=L.a;const px=-Math.sin(L.a),py=Math.cos(L.a);e.x+=(L.x+px*L.r*0.66-e.x)*Math.min(1,dt*4);e.y+=(L.y+py*L.r*0.66-e.y)*Math.min(1,dt*4);e.vx=L.vx;e.vy=L.vy;e.spin=L.spin;continue;}}
   let spd=s.spd*slow,wantA=null;
   // поведение
   let flee=s.flee&&dP<e.r*5+pR*2&&pR>e.r*0.75&&!(e.sp==='euglena'&&(e.bond>0||Math.hypot(P.vx,P.vy)<D.speed*0.45));
@@ -558,7 +571,8 @@ function updateEnts(dt){
   }else if(s.beh==='trap'||s.beh==='drift'||s.beh==='roll'||s.beh==='glide'){
    e.wa+=rnd(-1,1)*dt*0.5;wantA=e.wa;
   }else{ // wander
-   e.wa+=rnd(-1,1)*dt*1.4;wantA=e.wa;if(e.sp==='paramecium')e.spin=(e.spin||0)+dt*3;
+   e.wa+=rnd(-1,1)*dt*1.4;wantA=e.wa;
+   if(e.sp==='paramecium'&&!e.conj&&!e.div&&!e.fleeT&&R_()<dt/70){let bd=260,pp=null;for(const o of ents){if(o===e||o.sp!=='paramecium'||o.conj||o.div||o.eaten||o.dead)continue;const d=Math.hypot(o.x-e.x,o.y-e.y);if(d<bd){bd=d;pp=o;}}if(pp){e.conj={p:pp,t:8,lead:true};pp.conj={p:e,t:8,lead:false};lifePop(e,'Конъюгация');}}
    const g=e.grp&&GRP[e.grp];if(g&&g.n>1){const cx=g.x/g.n,cy=g.y/g.n,cd=Math.hypot(cx-e.x,cy-e.y)||1;const coh=cd>e.r*2.4?Math.min(2,cd/(e.r*3)):cd<e.r*1.4?-1.2:0;let sx=0,sy=0;for(const o of ents){if(o===e||o.grp!==e.grp)continue;const ox=e.x-o.x,oy=e.y-o.y,od=Math.hypot(ox,oy);if(od<e.r*1.6&&od>0.1){sx+=ox/od*(1-od/(e.r*1.6))*2.5;sy+=oy/od*(1-od/(e.r*1.6))*2.5;}}const vx=Math.cos(e.wa)*0.4+g.hx/g.n+(cx-e.x)/cd*coh+sx,vy=Math.sin(e.wa)*0.4+g.hy/g.n+(cy-e.y)/cd*coh+sy;wantA=Math.atan2(vy,vx);}
   }
   if(flee){wantA=Math.atan2(e.y-P.y,e.x-P.x);spd=s.spd*1.15*slow;}
@@ -567,16 +581,20 @@ function updateEnts(dt){
   if(e.sp==='paramecium'&&e.aggro>0&&dP<e.r+pR+50){e.tri=(e.tri||0)-dt;if(e.tri<=0){e.tri=2.5;const ba=Math.atan2(P.y-e.y,P.x-e.x);for(let k=0;k<8;k++){const a=ba+rnd(-0.6,0.6);shots.push({x1:e.x+Math.cos(a)*e.r*0.4,y1:e.y+Math.sin(a)*e.r*0.3,x2:e.x+Math.cos(a)*(e.r*0.4+70),y2:e.y+Math.sin(a)*(e.r*0.3+70),t:0.35,c:'tri'});}if(P.inv<=0){deathCause='трихоцисты туфельки';hurt(4,null);}lifePop(e,'Трихоцисты!');}}
   if(wantA!==null)steer(e,wantA,dt,s.turn||1);
   if(Math.hypot(e.x,e.y)>DROP_R*0.97){e.wa=Math.atan2(-e.y,-e.x);}
-  const tvx=Math.cos(e.a)*spd,tvy=Math.sin(e.a)*spd;const kk=Math.min(1,dt*3);e.vx+=(tvx-e.vx)*kk;e.vy+=(tvy-e.vy)*kk;
+  if(e.div)spd*=0.15;if(e.conj)spd*=0.35;
+  let tvx=Math.cos(e.a)*spd,tvy=Math.sin(e.a)*spd;if((e.sp==='paramecium'||e.sp==='euglena')&&!e.conj){const wv=Math.sin(e.t*3.2+e.seed*9)*spd*0.45;tvx+=-Math.sin(e.a)*wv;tvy+=Math.cos(e.a)*wv;e.spin=(e.spin||0)+dt*(spd>5?3.2:0.6);}
+  const kk=Math.min(1,dt*12);e.vx+=(tvx-e.vx)*kk;e.vy+=(tvy-e.vy)*kk;
   const fk=s.beh==='sessile'?0:1;e.x+=(e.vx+fl[0]*fk)*dt;e.y+=(e.vy+fl[1]*fk)*dt;
   if(e.r>34&&s.beh!=='hydra'&&s.beh!=='sessile'&&s.beh!=='egg'){for(const t of thickets){const dd=Math.hypot(e.x-t.x,e.y-t.y);if(dd<t.r+e.r*0.8&&dd>1){const m=t.r+e.r*0.8-dd;e.x+=(e.x-t.x)/dd*m*0.5;e.y+=(e.y-t.y)/dd*m*0.5;if(s.spd)e.wa=Math.atan2(e.y-t.y,e.x-t.x);}}}
   if(e.sp==='volvox')e.spin=(e.spin||0)+dt*0.4;
   if(e.growTo&&e.r<e.growTo){e.r=Math.min(e.growTo,e.r+dt*1.6);e.maxHp=s.hp*(e.r/s.r[0])**1.2;e.hp=Math.min(e.maxHp,e.hp+dt*2);}
   if(orgCount<orgCap()){
-   if(e.sp==='amoeba'&&e.r>115&&e.hp>e.maxHp*0.85&&R_()<dt/40){const nr=e.r*0.72;e.r=nr;e.maxHp=s.hp*(nr/s.r[0])**1.2;e.hp=e.maxHp;e.growTo=rnd(110,160);const b=spawnEnt('amoeba',e.x+nr*1.7*Math.cos(e.a+1.57),e.y+nr*1.7*Math.sin(e.a+1.57));b.r=nr;b.maxHp=e.maxHp;b.hp=b.maxHp;b.growTo=rnd(110,160);orgCount++;lifePop(e,'Амёба делится');}
+   if(!e.div&&!e.conj&&((e.sp==='amoeba'&&e.r>115&&R_()<dt/40)||(e.sp==='paramecium'&&e.r>=s.r[0]*0.95&&R_()<dt/80)||(e.sp==='euglena'&&e.r>=s.r[0]*0.95&&R_()<dt/70))&&e.hp>e.maxHp*0.8){e.div={t:0,dur:e.sp==='amoeba'?6:4.5,type:e.sp==='euglena'?'long':'trans'};orgCount++;lifePop(e,e.sp==='euglena'?'Эвглена делится вдоль':e.sp==='amoeba'?'Амёба делится':'Туфелька делится');}
+   else if(false){const nr=e.r*0.72;e.r=nr;e.maxHp=s.hp*(nr/s.r[0])**1.2;e.hp=e.maxHp;e.growTo=rnd(110,160);const b=spawnEnt('amoeba',e.x+nr*1.7*Math.cos(e.a+1.57),e.y+nr*1.7*Math.sin(e.a+1.57));b.r=nr;b.maxHp=e.maxHp;b.hp=b.maxHp;b.growTo=rnd(110,160);orgCount++;lifePop(e,'Амёба делится');}
    else if(e.sp==='rotifer'&&e.r>=65&&R_()<dt/28){const eg=spawnEnt('egg',e.x-Math.cos(e.a)*e.r*1.3,e.y-Math.sin(e.a)*e.r*1.3);eg.t=0;orgCount++;lifePop(e,'Коловратка отложила яйцо');}
    else if(e.sp==='volvox'&&e.r>150&&R_()<dt/45){const d2=spawnEnt('volvox',e.x+rnd(-1,1)*e.r*0.3,e.y+rnd(-1,1)*e.r*0.3);d2.r=rnd(40,55);d2.maxHp=s.hp*(d2.r/s.r[0])**1.2;d2.hp=d2.maxHp;d2.growTo=rnd(150,210);orgCount++;lifePop(e,'Вольвокс выпустил дочернюю колонию');}
   }
+  if(e.div){e.div.t+=dt;if(e.div.t>=e.div.dur)finishDiv(e,s);}
   if(e.sp==='egg'&&e.t>35){e.dead=true;const r2=spawnEnt('rotifer',e.x,e.y);r2.r=38;r2.maxHp=SP.rotifer.hp*(38/70)**1.2;r2.hp=r2.maxHp;r2.growTo=rnd(70,95);lifePop(e,'Из яйца вылупилась коловратка');continue;}
   if(e.hp<=0){killEnt(e);}
  }
@@ -688,6 +706,7 @@ const DRAW={
  detritus(e,t){const r=e.r;ctx.fillStyle=ST.glow?'rgba(210,180,140,0.35)':'rgba(110,85,50,0.45)';blobPath(r,e.seed,0,0.35,3);ctx.fill();ctx.fillStyle=ST.gran(0.6);granules(4,r*0.6,e.seed,0,ST.gran(0.6),r*0.3);},
  kin(e,t){BS=playerBS();const a=Math.max(0,Math.min(1,e.life/8));ctx.globalAlpha*=a;drawCellShape({bx:0,by:0,ox:-1,oy:0,t:e.t0||'basic',edge:true,core:true,seed:e.seed},t,e.hue,e.x,e.y,e.a);ctx.globalAlpha=1;},
  euglena(e,t){
+  ctx.scale(1,0.62+0.38*Math.abs(Math.cos(e.spin||0)));
   const L=e.r,w=e.r*0.32*(1+0.18*Math.sin(t*1.7+e.seed*9));
   const path=()=>{ctx.beginPath();for(let i=0;i<=30;i++){const u=i/30*TAU;const x=Math.cos(u)*L,y=Math.sin(u)*w*Math.pow(Math.abs(Math.cos(u*0.5)),0.0)*(1-0.55*Math.max(0,-Math.cos(u))**2);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();};
   wave(L*0.92,0,0,L*1.1,L*0.08,t+e.seed,ST.hair(1),PX*1.1,18);
@@ -708,7 +727,7 @@ const DRAW={
  },
  paramecium(e,t){
   const a=e.r,b=e.r*0.36;const pts=ellipsePts(a,b,64,0.28);const path=()=>polyPath(pts);
-  const sp=Math.sin(e.spin||0)*0.15;ctx.scale(1,1-Math.abs(sp));
+  const sp=Math.sin(e.spin||0)*0.32;ctx.scale(1,1-Math.abs(sp));
   ctx.fillStyle=ST.cyto(45,1.6);path();ctx.fill();
   granules(40,b*0.75,e.seed,t,ST.gran(0.55),a*0.022);
   ctx.fillStyle=ST.nuc(1.4);ell(0,-b*0.1,a*0.2,b*0.38,0.2);ctx.fill();ctx.strokeStyle=ST.nucRim(0.6);ctx.lineWidth=PX;ctx.stroke();
@@ -926,6 +945,12 @@ function drawBody(cw,t,wx,wy,wa,alpha){
  const hue=BS.hue;ctx.fillStyle=ST.cytoP(hue,1.5);for(const w of cw){cellPath(w,t,CELL_R*1.04);ctx.fill();}
  const nerves=cw.filter(w=>w.t==='nerve');if(nerves.length){ctx.strokeStyle=ST.stain(50,0.7);ctx.lineWidth=PX*1.1;ctx.beginPath();for(const nw of nerves)for(const o of cw){const d=Math.hypot(o.bx-nw.bx,o.by-nw.by);if(d>1&&d<CELL_R*2.2){ctx.moveTo(nw.bx,nw.by);ctx.quadraticCurveTo((nw.bx+o.bx)/2+Math.sin(t+d)*2,(nw.by+o.by)/2,o.bx,o.by);}}ctx.stroke();}
  for(const w of cw)drawInner(w,t,hue);
+ if(BS.un===P.un&&P.vacs)for(const v of P.vacs){const w=cw[v.ci];if(!w)continue;const p=1-v.t/v.dur,x=w.bx+v.ox,y=w.by+v.oy,vr=v.sz*(0.75+0.25*p);
+  ctx.fillStyle=ST.vac(1.2);circ(x,y,vr);ctx.fill();
+  const col=v.k==='chlorella'||v.k==='euglena'||v.k==='volvox'?ST.chlo(0.35+0.6*p):v.k==='detritus'?(ST.dark?`rgba(210,180,130,${0.2+0.5*p})`:`rgba(110,80,40,${0.25+0.5*p})`):ST.gran(0.3+0.6*p);
+  ctx.fillStyle=col;circ(x+Math.sin(t+v.ox)*vr*0.1,y,vr*0.72*Math.max(0.05,p));ctx.fill();
+  if(p<0.75){ctx.fillStyle=ST.stain(30,0.35*(1-p));circ(x,y,vr*0.9);ctx.fill();}
+  ctx.strokeStyle=ST.vacRim(0.9);ctx.lineWidth=PX*0.8;circ(x,y,vr);ctx.stroke();}
  for(const w of cw){mem(()=>cellPath(w,t,CELL_R*1.04),wx,wy,wa,0.85,1,a=>ST.memP(hue,a));if(w.t==='armor'){mem(()=>cellPath(w,t,CELL_R*1.2),wx,wy,wa,0.9,2.2,a=>ST.memP(hue,a));}}
  ctx.globalAlpha=1;
 }
@@ -996,7 +1021,12 @@ function drawWorld(){
   ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.a);
   if(e.eaten){const k=1-e.eaten;ctx.scale(k,k);ctx.globalAlpha=k;}
   if(e.r*cam.s<1.2&&SP[e.sp]&&SP[e.sp].kind==='food'){ctx.fillStyle=e.sp==='chlorella'?ST.chlo(0.8):ST.gran(0.9);ctx.fillRect(-PX,-PX,2*PX,2*PX);}
+  else if(e.div&&e.div.t/e.div.dur>0.12){const p=Math.min(1,e.div.t/e.div.dur);
+   if(e.div.type==='long'){for(const sg of[-1,1]){ctx.save();ctx.translate(0,sg*e.r*0.3*p);ctx.rotate(-sg*0.25*p);ctx.scale(1,1-0.35*p);f(e,T);ctx.restore();}}
+   else if(e.sp==='amoeba'){for(const sg of[-1,1]){ctx.save();ctx.translate(0,sg*e.r*0.75*p);ctx.scale(1-0.28*p,1-0.28*p);f(e,T);ctx.restore();}}
+   else{for(const sg of[-1,1]){ctx.save();ctx.translate(sg*e.r*0.5*p,0);ctx.scale(1-0.4*p,1);f(e,T);ctx.restore();}}}
   else f(e,T);
+  if(e.conj&&e.conj.lead){const r=e.r;ctx.strokeStyle=ST.nucRim(0.8);ctx.lineWidth=PX*1.2;ctx.beginPath();for(let k=-3;k<=3;k++){const x=k*r*0.07;ctx.moveTo(x,r*0.22);ctx.lineTo(x+Math.sin(T*6+k)*r*0.02,r*0.44);}ctx.stroke();ctx.fillStyle=ST.nuc(1.6);circ(Math.sin(T*1.5)*r*0.12,r*0.33,r*0.04);ctx.fill();}
   if(e.bond>0){ctx.strokeStyle='rgba(255,210,90,0.9)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(0,0,e.r*1.25,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,e.bond/3));ctx.stroke();}
   if(e.ally){ctx.strokeStyle='rgba(255,210,90,0.55)';ctx.lineWidth=1.2*PX;ctx.setLineDash([3*PX,3*PX]);circ(0,0,e.r*1.2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.globalAlpha=1;

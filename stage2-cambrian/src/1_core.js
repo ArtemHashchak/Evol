@@ -14,35 +14,39 @@ addEventListener('resize',resize);resize();
 
 /* ===== мир: вертикальный разрез океана =====
    x — по горизонтали (слева шельф, справа впадина), z — высота над «нулём», поверхность на SURF */
-const SURF=520,HALF=3000,T=6,GN=Math.floor(HALF*2/T)+1;
+const SURF=1100,HALF=12000,T=6,GN=Math.floor(HALF*2/T)+1;
 let HM=new Float32Array(GN),TY=new Uint8Array(GN),MAT=new Float32Array(GN);
 const TYPES_FLOOR=['sand','mud','rock','mat'];
+const REEFS=[[-9000,260,40],[-5200,300,80],[-3800,260,90],[-1200,240,70],[3200,300,90],[6500,280,60]];
+function reefAt(x){let m=0;for(const[c,w]of REEFS)m=Math.max(m,Math.exp(-(((x-c)/(w*1.4))**2)));return m;}
 function genWorld(seed){
  NSEED=seed%100000;
  for(let i=0;i<GN;i++){const x=-HALF+i*T;
-  let h=470-60*smooth(-2900,-2300,x);       // лагуна у берега
-  h-=150*smooth(-1300,-300,x);               // спуск с шельфа
-  h-=190*smooth(150,950,x);                  // обрыв во впадину
-  h+=60*Math.exp(-(((x+720)/230)**2));       // риф на склоне
-  h+=40*Math.exp(-(((x-1700)/160)**2));      // подводный холм во впадине
-  h+=420*smooth(2550,2960,x);                // дальняя стена
-  h+=46*(fbm(x/420,3.1,3)-0.5)*2+9*(fbm(x/55,7.7,2)-0.5)*2;
+  let h=1065-75*smooth(-11800,-11000,x);     // берег и лагуна (4–10 м)
+  h-=330*smooth(-6200,-4200,x);              // склон с рифами (≈11 → 44 м)
+  h-=60*smooth(-2600,-1800,x);               // терраса
+  h-=430*smooth(0,1300,x);                   // обрыв в глубоководную равнину (≈90 м)
+  h+=520*Math.exp(-(((x-6500)/900)**2));     // подводная гора с рифом на вершине
+  h-=170*smooth(7800,8800,x);                // жёлоб — самое глубокое место (≈105 м)
+  h+=980*smooth(11000,11900,x);              // дальняя стена
+  for(const[c,w,a]of REEFS)h+=a*Math.exp(-(((x-c)/w)**2));
+  h+=60*(fbm(x/520,3.1,3)-0.5)*2+18*(fbm(x/140,5.3,2)-0.5)*2+8*(fbm(x/45,7.7,2)-0.5)*2;
   HM[i]=clamp(h,30,SURF-14);}
  for(let i=0;i<GN;i++){const x=-HALF+i*T,h=HM[i];const sl=Math.abs(HM[Math.min(GN-1,i+1)]-HM[Math.max(0,i-1)])/(T*2);
-  let t=0;if(sl>0.55)t=2;else if(h<175)t=1;else if(h>330&&fbm(x/170,2.2,2)>0.5)t=3;TY[i]=t;MAT[i]=t===3?0.6+0.4*R_():0;}
+  let t=0;if(sl>0.55)t=2;else if(h<SURF*0.4)t=1;else if(h>SURF*0.8&&fbm(x/170,2.2,2)>0.5)t=3;TY[i]=t;MAT[i]=t===3?0.6+0.4*R_():0;}
 }
 function gIdx(x){return clamp(Math.round((x+HALF)/T),0,GN-1);}
 function floorH(x){const f=clamp((x+HALF)/T,0,GN-1.001),i=Math.floor(f),u=f-i;return HM[i]+(HM[i+1]-HM[i])*u;}
 function floorType(x){return TYPES_FLOOR[TY[gIdx(x)]];}
 function o2At(z){return clamp(0.12+0.88*Math.pow(clamp(z/SURF,0,1),0.9),0,1);}
-function zoneAt(x){const h=floorH(x);return h>330?'shelf':h>175?'slope':'deep';}
+function zoneAt(x){const h=floorH(x);return h>SURF*0.8?'shelf':h>SURF*0.4?'slope':'deep';}
 const ZONES={shelf:{ru:'Солнечный шельф',info:'Мелководье: много света и кислорода, водорослевые маты — пастбище для травоядных.'},slope:{ru:'Склон с рифами',info:'Рифы из археоциат и губок, трилобиты; хищники охотятся у кромки.'},deep:{ru:'Тёмная впадина',info:'Мало света и кислорода — без жабр долго не продержаться. Зато много падали и древних хищников.'}};
 
 /* ===== камера: вид сбоку ===== */
 const cam={x:0,z:300,s:6,ts:6};
 function proj(x,y,z){return[(x-cam.x)*cam.s+W/2,(cam.z-z)*cam.s+H/2];}
 function camUpdate(tx,ty,tz,dt){cam.s+=(cam.ts-cam.s)*Math.min(1,dt*2);cam.x+=(tx-cam.x)*Math.min(1,dt*3.5);let wz=tz+H*0.06/cam.s;cam.z+=(wz-cam.z)*Math.min(1,dt*3);
- const top=SURF-H*0.32/cam.s;if(cam.z>top)cam.z=top;}
+ const top=SURF-H*0.1/cam.s;if(cam.z>top)cam.z=top;}
 function screenToWorld(sx,sy){return[cam.x+(sx-W/2)/cam.s,cam.z-(sy-H/2)/cam.s];}
 const sxW=x=>(x-cam.x)*cam.s+W/2,syW=z=>(cam.z-z)*cam.s+H/2;
 
@@ -50,16 +54,24 @@ const sxW=x=>(x-cam.x)*cam.s+W/2,syW=z=>(cam.z-z)*cam.s+H/2;
 let T_=0;
 function waterRGB(z){const t=clamp(z/SURF,0,1),q=t*t;return[lerp(6,46,q),lerp(22,118,q),lerp(38,138,q)];}
 const rgb=(c,a)=>a==null?`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`:`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+function waveY(wx){return Math.sin(wx*0.07+T_*1.6)*1.4+Math.sin(wx*0.023-T_*0.9)*2.2+Math.sin(wx*0.17+T_*2.7)*0.5;}
 function drawWater(){
  ctx.setTransform(DPR,0,0,DPR,0,0);
  const zt=cam.z+H/2/cam.s,zb=cam.z-H/2/cam.s;const g=ctx.createLinearGradient(0,0,0,H);
- for(let k=0;k<=6;k++){const z=lerp(zt,zb,k/6);g.addColorStop(k/6,z>SURF?'rgb(150,205,215)':rgb(waterRGB(z)));}
+ for(let k=0;k<=8;k++){const z=lerp(zt,zb,k/8);g.addColorStop(k/8,rgb(waterRGB(Math.min(z,SURF))));}
  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
  const sy=syW(SURF);
- if(sy>-40){// поверхность снизу: окно Снелла и рябь
-  const g2=ctx.createLinearGradient(0,sy-60,0,sy+30);g2.addColorStop(0,'rgba(210,240,240,0.9)');g2.addColorStop(0.7,'rgba(160,215,220,0.6)');g2.addColorStop(1,'rgba(120,190,200,0)');ctx.fillStyle=g2;ctx.fillRect(0,0,W,sy+30);
-  ctx.strokeStyle='rgba(235,255,255,0.55)';ctx.lineWidth=1.5;ctx.beginPath();for(let x=0;x<=W;x+=6){const wx=cam.x+(x-W/2)/cam.s;const y=sy+Math.sin(wx*0.08+T_*1.6)*2.2+Math.sin(wx*0.031-T_*0.9)*3;x?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,0.10)';for(let k=0;k<26;k++){const wx=Math.floor(cam.x/40)*40+(k-13)*40;const x=sxW(wx+Math.sin(T_*0.7+k)*12);ctx.beginPath();ctx.ellipse(x,sy+5+hash(k,Math.floor(cam.x/40))*8,18+12*hash(k,3),2.5,0,0,TAU);ctx.fill();}
+ if(sy>-30){
+  // небо над водой
+  const gs=ctx.createLinearGradient(0,Math.min(0,sy-H*0.5),0,sy);gs.addColorStop(0,'rgb(118,170,210)');gs.addColorStop(0.75,'rgb(196,222,232)');gs.addColorStop(1,'rgb(232,240,236)');ctx.fillStyle=gs;
+  ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(W,-2);for(let x=W;x>=-6;x-=6){const wx=cam.x+(x-W/2)/cam.s;ctx.lineTo(x,sy-waveY(wx)*cam.s*0.6);}ctx.closePath();ctx.fill();
+  const sun=ctx.createRadialGradient(W*0.72,sy-H*0.35,0,W*0.72,sy-H*0.35,H*0.5);sun.addColorStop(0,'rgba(255,250,225,0.65)');sun.addColorStop(1,'rgba(255,250,225,0)');ctx.fillStyle=sun;ctx.fillRect(0,0,W,Math.max(0,sy));
+  // дальний берег/горизонт
+  ctx.fillStyle='rgba(150,175,175,0.5)';ctx.beginPath();ctx.moveTo(0,sy);for(let x=0;x<=W;x+=10){const wx=cam.x*0.1+x/cam.s*0.1;ctx.lineTo(x,sy-3-6*fbm(wx/30,1.5,2));}ctx.lineTo(W,sy);ctx.closePath();ctx.fill();
+  // подсвеченная плёнка под поверхностью
+  const g2=ctx.createLinearGradient(0,sy,0,sy+Math.max(40,cam.s*12));g2.addColorStop(0,'rgba(170,225,230,0.55)');g2.addColorStop(1,'rgba(120,195,210,0)');ctx.fillStyle=g2;ctx.fillRect(0,sy-4,W,Math.max(40,cam.s*12)+4);
+  ctx.strokeStyle='rgba(245,255,255,0.85)';ctx.lineWidth=Math.max(1.5,cam.s*0.25);ctx.beginPath();for(let x=-6;x<=W+6;x+=6){const wx=cam.x+(x-W/2)/cam.s;const y=sy-waveY(wx)*cam.s*0.6;x>-6?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.12)';for(let k=0;k<26;k++){const id=Math.floor(cam.x/40)+k-13;const x=sxW(id*40+Math.sin(T_*0.7+k)*12);ctx.beginPath();ctx.ellipse(x,sy+4+hash(k,id)*8,18+12*hash(k,3),2.5,0,0,TAU);ctx.fill();}
  }
 }
 function drawRays(){
@@ -74,7 +86,7 @@ function drawRays(){
 function drawParallax(){
  ctx.setTransform(DPR,0,0,DPR,0,0);
  for(const[k,off,lift,al]of[[0.35,733,70,0.55],[0.62,1999,28,0.7]]){
-  const pts=[];for(let sx=-8;sx<=W+8;sx+=6){const lx=cam.x+(sx-W/2)/(cam.s*k);let lz=floorH(lx*0.8+off)+lift;lz+=34*Math.max(0,fbm(lx/40,k*9,2)-0.55)*(lz>200?1:0.3);lz+=18*Math.max(0,Math.sin(lx*0.09)*fbm(lx/90,k,2)-0.2);pts.push([sx,H/2+(cam.z-lz)*cam.s*k]);}
+  const pts=[];for(let sx=-8;sx<=W+8;sx+=6){const lx=cam.x+(sx-W/2)/(cam.s*k);let lz=floorH(lx*0.8+off)+lift;lz+=34*Math.max(0,fbm(lx/40,k*9,2)-0.55)*(lz>200?1:0.3);lz+=18*Math.max(0,Math.sin(lx*0.09)*fbm(lx/90,k,2)-0.2);lz=Math.min(lz,SURF-40);pts.push([sx,H/2+(cam.z-lz)*cam.s*k]);}
   const zc=cam.z-60;const c=waterRGB(zc);const f=[c[0]*0.75+4,c[1]*0.8+6,c[2]*0.85+8];
   const g=ctx.createLinearGradient(0,Math.min(...pts.map(p=>p[1])),0,H);g.addColorStop(0,rgb(f,al*0.8));g.addColorStop(1,rgb([f[0]*0.6,f[1]*0.6,f[2]*0.6],al));
   ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(-8,H+5);for(const p of pts)ctx.lineTo(p[0],p[1]);ctx.lineTo(W+8,H+5);ctx.closePath();ctx.fill();}
@@ -104,7 +116,7 @@ function drawFloorFront(){// ближнее дно под линией: текс
  // светлая кромка
  ctx.strokeStyle='rgba(255,240,200,0.18)';ctx.lineWidth=Math.max(1,s*0.35);ctx.beginPath();top.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();
  // каустика на мелководье
- const cz=floorH(cam.x);if(cz>230){ctx.save();ctx.globalCompositeOperation='lighter';const k=clamp((cz-230)/240,0,1)*0.13;
+ const cz=floorH(cam.x);if(cz>SURF*0.5){ctx.save();ctx.globalCompositeOperation='lighter';const k=clamp((cz-SURF*0.5)/(SURF*0.45),0,1)*0.13;
   for(let i=0;i<top.length;i+=2){const[sx,y,x]=top[i];const v=Math.sin(x*0.21+T_*1.3)+Math.sin(x*0.13-T_*1.7)+Math.sin(x*0.37+T_*0.6);if(v<1)continue;const a=k*(v-1)*lightAt(floorH(x));ctx.fillStyle=`rgba(255,250,210,${a})`;ctx.beginPath();ctx.ellipse(sx,y+s*2+Math.sin(x)*s,s*2.4,s*0.8,0,0,TAU);ctx.fill();}
   ctx.restore();}
  // зерно, камешки, рябь
@@ -121,14 +133,14 @@ let decor=[];
 function genDecor(seed){
  const r=srand(seed+99);decor=[];
  const put=(k,x,o)=>decor.push(Object.assign({k,x,s:1,seed:r(),l:r()<0.62?-1:r()<0.82?0:1},o));
- for(let x=-HALF+60;x<HALF-80;x+=4){const h=floorH(x);const reef=Math.exp(-(((x+720)/330)**2));
-  if(h>230&&h<450&&r()<0.01+0.09*reef){put(r()<0.55?'archaeo':'sponge',x,{s:5+r()*13});}
-  if(h>360&&r()<0.007)put('strom',x,{s:12+r()*22});
-  if(h>250&&r()<0.012)put('alga',x,{s:8+r()*18});
+ for(let x=-HALF+60;x<HALF-80;x+=4){const h=floorH(x);const reef=reefAt(x);
+  if(h>SURF*0.45&&h<SURF*0.93&&r()<0.01+0.09*reef){put(r()<0.55?'archaeo':'sponge',x,{s:5+r()*13});}
+  if(h>SURF*0.84&&r()<0.007)put('strom',x,{s:12+r()*22});
+  if(h>SURF*0.55&&r()<0.012)put('alga',x,{s:8+r()*18});
   if(r()<0.01)put(r()<0.5?'rock':'shell',x,{s:2+r()*8});
-  if(h<200&&r()<0.012)put('sponge',x,{s:8+r()*16,deep:1});
-  if(h<220&&r()<0.014)put('tubes',x,{s:4+r()*8});
-  if(h<200&&r()<0.006)put('glow',x,{s:3+r()*5});}
+  if(h<SURF*0.4&&r()<0.012)put('sponge',x,{s:8+r()*16,deep:1});
+  if(h<SURF*0.42&&r()<0.014)put('tubes',x,{s:4+r()*8});
+  if(h<SURF*0.38&&r()<0.006)put('glow',x,{s:3+r()*5});}
  for(const d of decor){if(d.l===1)d.s*=1.25;d.z=floorH(d.x);}
  decor.sort((a,b)=>a.l-b.l);
 }

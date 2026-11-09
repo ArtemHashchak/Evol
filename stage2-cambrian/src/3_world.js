@@ -17,13 +17,13 @@ const SPEC={
  pikaia:{ru:'Пикайя',lat:'Pikaia',beh:'school',zones:{shelf:3,slope:3,deep:1},rel:[0.3,1.2],sc:[0.5,3],hueVar:15,
   info:'Плоский червеобразный зверёк с хордой вдоль спины — один из первых хордовых, дальний предок рыб и человека.',
   body:()=>mkBody('bilateral',[0.8,0.9,0.9,0.85,0.8,0.7,0.6,0.5],205,'notochord',s=>{addP(s[0],'eyes',0.8);addP(s[7],'tailfin',0.8);})},
- opabinia:{ru:'Опабиния',lat:'Opabinia',beh:'hunt',zones:{shelf:1.5,slope:2.5,deep:1},rel:[0.9,1.6],sc:[0.5,3.5],hueVar:15,fight:1,
+ opabinia:{ru:'Опабиния',lat:'Opabinia',beh:'hunt',zones:{shelf:2,slope:2,deep:1.5},rel:[0.9,1.6],sc:[0.5,3.5],hueVar:15,fight:1,
   info:'Пятиглазый хищник с длинным хоботком-клешнёй. Охотится на мелочь.',
   body:()=>mkBody('bilateral',[1.3,1.45,1.45,1.4,1.3,1.15,1.0,0.8],12,'none',s=>{addP(s[0],'compound',0.9);addP(s[0],'proboscis');for(let i=1;i<7;i++)addP(s[i],'fin',0.8);addP(s[7],'tailfin');})},
- anomalocaris:{ru:'Аномалокарис',lat:'Anomalocaris',beh:'hunt',apex:1,zones:{shelf:0.4,slope:1.6,deep:2},rel:[1.4,2.6],sc:[0.35,5],hueVar:12,fight:1,
+ anomalocaris:{ru:'Аномалокарис',lat:'Anomalocaris',beh:'hunt',apex:1,zones:{shelf:1,slope:1.5,deep:1.5},rel:[1.4,2.6],sc:[0.35,5],hueVar:12,fight:1,
   info:'Высший хищник кембрия: до метра длиной, хватательные клешни, огромные фасеточные глаза, плавает волнами лопастей.',
   body:()=>mkBody('bilateral',[2.1,2.4,2.45,2.4,2.3,2.1,1.9,1.7,1.5,1.3,1.1],352,'none',s=>{addP(s[0],'compound',1.2);addP(s[0],'grab',1.2);for(let i=1;i<10;i++)addP(s[i],'fin',1.1);addP(s[10],'tailfin',1.2);})},
- reaper:{ru:'Кольчатый жнец',lat:'Annulomessor (вымышл.)',beh:'hunt',zones:{shelf:0,slope:0.6,deep:2},rel:[1.2,2.2],sc:[0.5,4],hueVar:10,fight:1,fic:1,
+ reaper:{ru:'Кольчатый жнец',lat:'Annulomessor (вымышл.)',beh:'hunt',zones:{shelf:0.5,slope:1,deep:1.8},rel:[1.2,2.2],sc:[0.5,4],hueVar:10,fight:1,fic:1,
   info:'Вымышленный хищный червь глубин: челюсти, шипы на каждом кольце и глаза-камеры для темноты.',
   body:()=>mkBody('bilateral',[1.3,1.25,1.2,1.2,1.15,1.1,1.05,1,0.95,0.9,0.85,0.8,0.7,0.6],282,'none',s=>{addP(s[0],'cameye',1.1);addP(s[0],'jaws',1.3);for(let i=1;i<14;i++)addP(s[i],'spine',0.7);for(let i=2;i<13;i+=2)addP(s[i],'fin',0.6);})},
  jelly:{ru:'Медуза',lat:'Medusozoa',beh:'drift',sting:1,zones:{shelf:2,slope:2,deep:1.5},rel:[0.4,1.8],sc:[0.4,3.5],hueVar:40,
@@ -48,12 +48,12 @@ function spawnEnt(sp,x,y,sc,o){
  const e={id:entId++,sp,S,b,st,x,y,z:Math.min(z,SURF-4),a:R_()*TAU,hp:st.hpMax,t:R_()*10,state:'idle',tgt:null,cd:0,scan:R_()*0.4,curl:0,mv:0,dmgT:0,hid:S.beh==='ambush',full:0,wx:x,wy:y,wz:z,gone:false};
  e.pos=initChain(b,e.x,e.y,e.z,e.a);ents.push(e);return e;
 }
-function entVal(e){return e.st.M*2.4*(e.S.valK||1)+1;}
+function entVal(e){return e.st.M*1.1*(e.S.valK||1)+0.5;}
 function angD(a,b){let d=a-b;while(d>Math.PI)d-=TAU;while(d<-Math.PI)d+=TAU;return d;}
 function d3(a,b){return Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);}
 function headR(e){return e.b.segs[0].r;}
 /* ===== еда ===== */
-function addPlankton(x,y,z){foods.push({k:'pl',x,y,z,val:0.7,ph:R_()*TAU,hue:R_()<0.5?100:60});}
+function addPlankton(x,y,z){foods.push({k:'pl',x,y,z,val:0.35,ph:R_()*TAU,hue:R_()<0.5?100:60});}
 function addCarrion(x,y,z,val,r,sp){carr.push({x,y,z,val,val0:val,r,t:0,sp,seed:R_()});}
 /* ===== поведение ===== */
 function canSee(e,tg,range){if(tg===P){if(!P.alive||P.bur)return false;const dark=clamp(1-P.z/SURF,0,1);range*=1-0.4*dark;}else if(tg.hid)return false;return Math.hypot(tg.x-e.x,tg.y-e.y)<range&&Math.abs(tg.z-e.z)<range*0.7;}
@@ -146,6 +146,9 @@ function popTick(dt){
   if(S.beh==='school'){const sc=sizeFor(S),k=4+((R_()*6)|0);const lead=spawnEnt(sp,x,y,sc);lead.lead=lead;for(let q=1;q<k;q++){const e=spawnEnt(sp,x+rnd(-15,15),0,sc*rnd(0.85,1.1));e.lead=lead;e.ox=rnd(-1,1)*lead.st.L*2.5;e.oy=rnd(-1,1)*lead.st.L*2.5;e.oz=rnd(-1,1)*lead.st.L;e.z=lead.z+e.oz;e.pos=initChain(e.b,e.x,e.y,e.z,e.a);}n+=k;}
   else{spawnEnt(sp,x,y,sizeFor(S));n++;}
  }
+ // хищники распределены равномерно: в любой зоне рядом держится примерно одинаковое их число
+ const hunters=ents.filter(e=>e.S.beh==='hunt'&&!e.gone).length,wantH=4+Math.min(4,Math.floor(P.st.L/15));
+ if(hunters<wantH&&R_()<dt*1.2){const sd=R_()<0.5?-1:1,d=rnd(vr*1.05,ACT);const x=clamp(P.x+sd*d,-HALF*0.9,HALF*0.9);const zn=zoneAt(x);const hs=Object.keys(SPEC).filter(k=>SPEC[k].beh==='hunt');let tot=0;for(const k of hs)tot+=SPEC[k].zones[zn]||0;let r=R_()*tot,sp=hs[0];for(const k of hs){r-=SPEC[k].zones[zn]||0;if(r<=0){sp=k;break;}}spawnEnt(sp,x,0,sizeFor(SPEC[sp]));}
  // сородичи
  const kin=ents.filter(e=>e.sp==='kin');if(kin.length<2&&R_()<dt*0.4){const a=R_()*TAU,d=rnd(vr*1.05,vr*1.6);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;const b=cloneBody(P.body);scaleBody(b,rnd(0.85,1.05));const e=spawnEnt('kin',x,y,1,{body:b,un:P.un});e.mate=true;}
  // планктон

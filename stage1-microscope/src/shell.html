@@ -26,6 +26,11 @@ button:disabled{opacity:.4;cursor:default}
 .modes button b{display:block;font-size:14px}.modes button span{font-size:12px;color:#a8b0c0}
 .tog{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #222a38;cursor:pointer;font-size:13px}
 .tog input{width:16px;height:16px}
+.achs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.ach{background:#1a2030;border:1px solid #2c3446;border-radius:9px;padding:7px 9px;font-size:12px}
+.ach b{display:block;font-size:13px}.ach.no{opacity:.45}.ach.yes{border-color:#7a6a2a;background:#2a2615}.ach.yes b{color:#ffd47a}
+table.runs{width:100%;border-collapse:collapse;font-size:12px}table.runs td,table.runs th{padding:4px 6px;border-bottom:1px solid #232b3a;text-align:left}
+table.runs th{color:#8a94a8;font-weight:500}.best{color:#9fe0a8;font-weight:600}
 #scale{position:fixed;left:14px;bottom:14px;color:#fff;font-size:12px;text-shadow:0 0 3px #000,0 0 6px #000}
 #sbLine{height:4px;background:#fff;box-shadow:0 0 3px #000;margin-bottom:3px}
 #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);max-width:min(620px,70vw);text-align:center;font-size:13px}
@@ -74,7 +79,7 @@ button:disabled{opacity:.4;cursor:default}
  <div class="lbl"><span>Здоровье</span><span id="hpTxt"></span></div><div class="bar"><i id="hpBar"></i></div>
  <div class="lbl"><span id="bmLbl">Биомасса</span><span id="bmTxt"></span></div><div class="bar"><i id="bmBar"></i></div>
  <div class="lbl"><span>Клеток: <b id="cellTxt">1</b> / 30</span><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span></div>
- <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bAch">Итоги</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
 </div>
 <div id="scale"><div id="sbLine"></div><span id="sbText"></span><div id="obj"></div></div>
 <div id="toasts"></div>
@@ -118,6 +123,11 @@ button:disabled{opacity:.4;cursor:default}
  <div class="grp" style="margin-top:14px">Эффекты микроскопа</div>
  <div id="fxToggles"></div>
  <div class="small muted" style="margin-top:8px">Если игра тормозит, отключи размытие и частицы.</div>
+</div></div>
+<div id="mutm" class="modal hidden"><div class="box" style="max-width:480px" id="mutBox"></div></div>
+<div id="achm" class="modal hidden"><div class="box" style="max-width:900px;width:96vw">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="margin:0">Итоги и достижения</h2><button class="on" id="aClose">Закрыть</button></div>
+ <div id="achBody"></div>
 </div></div>
 <div id="pause" class="modal hidden"><div class="box" style="max-width:360px;text-align:center"><h2>Пауза</h2><button class="on" id="bResume">Продолжить</button></div></div>
 <script>

@@ -26,6 +26,11 @@ button:disabled{opacity:.4;cursor:default}
 .modes button b{display:block;font-size:14px}.modes button span{font-size:12px;color:#a8b0c0}
 .tog{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #222a38;cursor:pointer;font-size:13px}
 .tog input{width:16px;height:16px}
+.achs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.ach{background:#1a2030;border:1px solid #2c3446;border-radius:9px;padding:7px 9px;font-size:12px}
+.ach b{display:block;font-size:13px}.ach.no{opacity:.45}.ach.yes{border-color:#7a6a2a;background:#2a2615}.ach.yes b{color:#ffd47a}
+table.runs{width:100%;border-collapse:collapse;font-size:12px}table.runs td,table.runs th{padding:4px 6px;border-bottom:1px solid #232b3a;text-align:left}
+table.runs th{color:#8a94a8;font-weight:500}.best{color:#9fe0a8;font-weight:600}
 #scale{position:fixed;left:14px;bottom:14px;color:#fff;font-size:12px;text-shadow:0 0 3px #000,0 0 6px #000}
 #sbLine{height:4px;background:#fff;box-shadow:0 0 3px #000;margin-bottom:3px}
 #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);max-width:min(620px,70vw);text-align:center;font-size:13px}
@@ -74,7 +79,7 @@ button:disabled{opacity:.4;cursor:default}
  <div class="lbl"><span>Здоровье</span><span id="hpTxt"></span></div><div class="bar"><i id="hpBar"></i></div>
  <div class="lbl"><span id="bmLbl">Биомасса</span><span id="bmTxt"></span></div><div class="bar"><i id="bmBar"></i></div>
  <div class="lbl"><span>Клеток: <b id="cellTxt">1</b> / 30</span><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span></div>
- <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bAch">Итоги</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
 </div>
 <div id="scale"><div id="sbLine"></div><span id="sbText"></span><div id="obj"></div></div>
 <div id="toasts"></div>
@@ -118,6 +123,11 @@ button:disabled{opacity:.4;cursor:default}
  <div class="grp" style="margin-top:14px">Эффекты микроскопа</div>
  <div id="fxToggles"></div>
  <div class="small muted" style="margin-top:8px">Если игра тормозит, отключи размытие и частицы.</div>
+</div></div>
+<div id="mutm" class="modal hidden"><div class="box" style="max-width:480px" id="mutBox"></div></div>
+<div id="achm" class="modal hidden"><div class="box" style="max-width:900px;width:96vw">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="margin:0">Итоги и достижения</h2><button class="on" id="aClose">Закрыть</button></div>
+ <div id="achBody"></div>
 </div></div>
 <div id="pause" class="modal hidden"><div class="box" style="max-width:360px;text-align:center"><h2>Пауза</h2><button class="on" id="bResume">Продолжить</button></div></div>
 <script>
@@ -197,6 +207,7 @@ const SP={
  bell:{ru:'Светожгучка',r:[55,80],hp:28,food:20,dna:5,spd:14,turn:0.6,beh:'drift',dmg:5,sting:1,real:0,info:'Выдуманный колокол со жгучими нитями. Сам не охотится, но больно жжёт при касании. В темноте мерцает.'},
  volvox:{ru:'Вольвокс',r:[140,210],hp:85,food:42,dna:4,spd:18,turn:0.4,beh:'roll',real:1,info:'Шар-колония из сотен водорослей со жгутиками, внутри — дочерние колонии. Живой пример пути «клетки → колония».'},
  stentor:{ru:'Трубач (стентор)',r:[190,280],hp:130,food:55,dna:6,spd:0,turn:0,beh:'sessile',real:1,info:'Огромная синяя инфузория-труба, прикреплена ко дну. Венец ресничек закручивает воронку и засасывает мелочь.'},
+ egg:{ru:'Яйцо коловратки',r:[9,11],hp:6,food:8,dna:4,spd:0,turn:0,beh:'egg',real:1,notSpecies:1,info:'Коловратки откладывают яйца. Съешь яйцо — получишь много ДНК, а не успеешь — вылупится новая коловратка.'},
  tardigrade:{ru:'Тихоходка',r:[190,260],hp:320,food:110,dna:15,spd:24,turn:0.9,beh:'hunt',dmg:16,prey:1.15,real:1,info:'«Водяной медвежонок». Восемь лап с коготками, переживает почти всё. Самое опасное существо капли.'}
 };
 
@@ -231,7 +242,7 @@ const SAVE_KEY='evo_stage1_v1';
 let P,D={},ents=[],parts=[],farObj=[],nearObj=[],lights=[],slime=[],pops=[],shots=[];
 let T=0,cam={x:0,y:0,s:1,ts:1,obj:0,trans:0},paused=true,editorOpen=false,started=false;
 function newPlayer(){return{x:0,y:0,a:0,vx:0,vy:0,hp:10,cells:[{q:0,r:0,t:'basic'}],hue:150,pattern:'none',biomass:0,dna:0,gen:1,un:{},
- dashT:0,dashCd:0,stingCd:0,inv:2,hurt:0,lastHit:99,mode:'bright',kingdom:null,stats:{time:0,eaten:0,kills:0,div:0,deaths:0},seen:{},ate:{},slimeT:0,hintsDone:{}};}
+ dashT:0,dashCd:0,stingCd:0,inv:2,hurt:0,lastHit:99,mode:'bright',kingdom:null,stats:{time:0,eaten:0,kills:0,div:0,deaths:0,eggs:0,mutAcc:0,sinceDeath:0,maxAllies:0},seen:{},ate:{},killed:{},modesSeen:{},slimeT:0,hintsDone:{}};}
 
 /* ========== тело ========== */
 function hasN(id){return!!P.un[id];}
@@ -287,9 +298,12 @@ function spawnFood(x,y,kind,amt){const e={sp:kind,x,y,a:rnd(0,TAU),vx:0,vy:0,r:k
 function spawnPos(minK,maxK){const d=viewD();for(let k=0;k<20;k++){const a=rnd(0,TAU),r=d*rnd(minK,maxK);const x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;if(x*x+y*y<DROP_R*DROP_R*0.97)return[x,y];}return[P.x+rnd(-1,1)*d,P.y+rnd(-1,1)*d];}
 function spWeights(){
  const R=D.R||10;
- return{euglena:R<45?4:1.5,diatom:2,paramecium:R>9?3:1.5,didinium:1.2,heliozoa:1.4,spiker:R<14?0.15:1.4,rotifer:R>18?1.4:0.25,amoeba:1.1,bell:R>18?1:0.3,volvox:R>28?0.7:0.3,stentor:0.25,tardigrade:R>45?0.7:0.05};
+ return{euglena:R<45?4:1.5,diatom:2,paramecium:R>9?3:1.5,didinium:1.2,heliozoa:1.4,spiker:R<14?0.075:0.7,rotifer:R>18?1.4:0.25,amoeba:1.1,bell:R>18?1:0.3,volvox:R>28?0.7:0.3,stentor:0.25,tardigrade:R>45?0.7:0.05};
 }
-let spawnT=0;
+let spawnT=0,grpId=0,orgCount=0,allyCount=0;
+function orgCap(){return Math.round(9+Math.min(6,(D.R||10)*0.08))+6;}
+function maxAllies(){return 2+Math.floor(D.n/8);}
+function lifePop(e,txt){const sx=(e.x-cam.x)*cam.s,sy=(e.y-cam.y)*cam.s;if(Math.abs(sx)<W/2&&Math.abs(sy)<H/2)pop(e.x,e.y-e.r-8,txt,'#bfe0ff');}
 function fillWorld(all){
  const d=viewD();let food=0,org=0,plas=0;
  for(const e of ents){const s=SP[e.sp];if(e.sp==='plasmid')plas++;else if(!s||s.kind==='food')food++;else org++;}
@@ -301,10 +315,12 @@ function fillWorld(all){
  const w=spWeights(),keys=Object.keys(w);let tot=0;for(const k of keys)tot+=w[k];
  guard=0;
  while(org<orgTarget&&guard++<60){let r=R_()*tot,k=keys[0];for(const kk of keys){r-=w[kk];if(r<=0){k=kk;break;}}
-  const[x,y]=all?spawnPos(0.35,1.3):spawnPos(0.8,1.4);spawnEnt(k,x,y);org++;}
+  const[x,y]=all?spawnPos(0.35,1.3):spawnPos(0.8,1.4);
+  if(k==='paramecium'){const gid=++grpId,n=3+((R_()*4)|0),a0=rnd(0,TAU);for(let i=0;i<n;i++){const e2=spawnEnt(k,x+rnd(-90,90),y+rnd(-90,90));e2.grp=gid;e2.a=e2.wa=a0+rnd(-0.3,0.3);}org+=n;}
+  else{spawnEnt(k,x,y);org++;}}
  if(plas<3&&R_()<(all?1:0.02)){const[x,y]=spawnPos(all?0.3:0.8,1.3);spawnFood(x,y,'plasmid',1);}
 }
-function despawn(){const lim=viewD()*1.9;ents=ents.filter(e=>{if(e.eaten>=1||e.dead)return false;if(e.sp==='kin'&&e.life<=0)return false;const d=Math.hypot(e.x-P.x,e.y-P.y);return d<lim;});}
+function despawn(){const lim=viewD()*1.9;ents=ents.filter(e=>{if(e.eaten>=1||e.dead)return false;if(e.ally)return true;if(e.sp==='kin'&&e.life<=0)return false;const d=Math.hypot(e.x-P.x,e.y-P.y);return d<lim;});}
 
 /* ========== ввод ========== */
 const keys={};let mouse={x:0,y:0,on:false,down:false,moved:0},touchMode=false,lastInput='mouse';
@@ -314,7 +330,7 @@ addEventListener('keydown',e=>{
  if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))lastInput='keys';
  if(e.code==='KeyE'&&!setOpen){toggleEditor();e.preventDefault();}
  if(e.code==='Space'){doDash();e.preventDefault();}
- if(e.code==='KeyP'||e.code==='Escape'){if(setOpen)toggleSettings();else if(editorOpen)toggleEditor();else if(started)setPause(!paused);}
+ if(e.code==='KeyP'||e.code==='Escape'){if(pendingMut)return;if(achOpen)toggleAch();else if(setOpen)toggleSettings();else if(editorOpen)toggleEditor();else if(started)setPause(!paused);}
  const mi=['Digit1','Digit2','Digit3','Digit4'].indexOf(e.code);if(mi>=0&&!editorOpen)setMode(MODE_KEYS[mi]);
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -351,7 +367,7 @@ function updatePlayer(dt){
  if(D.slime){P.slimeT-=dt;if(P.slimeT<=0){P.slimeT=0.12;const w=D.cw[(R_()*D.cw.length)|0];slime.push({x:w.wx,y:w.wy,t:6,r:CELL_R*rnd(0.8,1.4)});}}
  for(const s of slime)s.t-=dt;slime=slime.filter(s=>s.t>0);
  if(D.sting){P.stingCd-=dt;if(P.stingCd<=0){fireSting();}}
- P.stats.time+=dt;
+ P.stats.time+=dt;P.stats.sinceDeath+=dt;
 }
 function gain(b,photo){
  const before=P.biomass;P.biomass+=b*(photo?1:D.digest);
@@ -364,7 +380,7 @@ function divide(){
 }
 function fireSting(){
  const range=D.R+70;let best=null,bd=1e9;
- for(const e of ents){const s=SP[e.sp];if(!s||s.kind==='food'||e.eaten||e.sp==='kin'||e.sp==='plasmid')continue;const d=Math.hypot(e.x-P.x,e.y-P.y)-e.r;if(d<range&&d<bd){bd=d;best=e;}}
+ for(const e of ents){const s=SP[e.sp];if(!s||s.kind==='food'||e.eaten||e.ally||e.sp==='kin'||e.sp==='plasmid')continue;const d=Math.hypot(e.x-P.x,e.y-P.y)-e.r;if(d<range&&d<bd){bd=d;best=e;}}
  if(!best){P.stingCd=0.3;return;}
  const src=D.cw.filter(w=>w.t==='sting'&&w.edge);const w=pick(src);
  shots.push({x1:w.wx,y1:w.wy,x2:best.x,y2:best.y,t:0.25});best.hp-=8;best.poison=3;best.aggro=3;
@@ -378,13 +394,14 @@ function hurt(amount,cellT){
 }
 let deathCause='';
 function playerDie(){
- P.stats.deaths++;P.gen++;const lost=Math.round(P.biomass*0.3);P.biomass-=lost;
+ P.stats.deaths++;P.gen++;P.stats.sinceDeath=0;const lost=Math.round(P.biomass*0.3);P.biomass-=lost;
  const a=rnd(0,TAU);P.x+=Math.cos(a)*600;P.y+=Math.sin(a)*600;const dc=Math.hypot(P.x,P.y);if(dc>DROP_R*0.9){P.x*=DROP_R*0.9/dc;P.y*=DROP_R*0.9/dc;}
  P.hp=D.hpMax;P.inv=3;P.vx=P.vy=0;
  ents=ents.filter(e=>Math.hypot(e.x-P.x,e.y-P.y)>viewD()*0.5||(SP[e.sp]&&SP[e.sp].kind==='food'));
  cam.x=P.x;cam.y=P.y;
  if(window.__deaths)window.__deaths.push(deathCause);toast('Ты погиб'+(deathCause?' ('+deathCause+')':'')+'. Род продолжает потомок — <b>поколение '+P.gen+'</b>. Потеряно '+lost+' биомассы.');
  save();
+ offerMutation();
 }
 
 /* ========== существа ========== */
@@ -392,7 +409,7 @@ function nearestCellDist(x,y){let bd=1e9,bw=null;for(const w of D.cw){const d=Ma
 function discover(e){const s=SP[e.sp];if(!s||s.kind==='food'||P.seen[e.sp])return;P.seen[e.sp]=1;qtoast('Новый вид в поле зрения: <b>'+s.ru+'</b>'+(s.real?'':' (выдуманный)')+'. '+s.info);}
 function onAte(e){const s=SP[e.sp];if(!s||s.kind==='food')return;if(!P.ate[e.sp]){P.ate[e.sp]=1;P.dna+=2;pop(e.x,e.y-e.r-6,'Открытие: '+s.ru+' +2 ДНК','#ffd47a');}}
 function killEnt(e){
- if(e.dead||e.eaten)return;e.dead=true;const s=SP[e.sp];P.stats.kills++;
+ if(e.dead||e.eaten)return;e.dead=true;const s=SP[e.sp];P.stats.kills++;P.killed[e.sp]=(P.killed[e.sp]||0)+1;if(e.sp==='egg')P.stats.eggs++;
  const n=Math.max(2,Math.min(10,Math.round(s.food/3)));for(let i=0;i<n;i++){const d=spawnFood(e.x+rnd(-1,1)*e.r*0.6,e.y+rnd(-1,1)*e.r*0.6,'detritus',s.food/n*0.9);d.vx=rnd(-15,15);d.vy=rnd(-15,15);}
  if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);
 }
@@ -401,11 +418,15 @@ function eatEnt(e){
  if(e.sp==='plasmid'){P.dna+=1;pop(e.x,e.y,'+1 ДНК','#ffd47a');return;}
  if(e.sp==='kin'){return;}
  const f=e.sp==='detritus'?e.food:s.food*(e.hp/e.maxHp*0.5+0.5);gain(f);P.stats.eaten++;
- if(s&&s.kind!=='food'){if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);pop(e.x,e.y+8,'+'+f.toFixed(0)+' биомассы','#e8c860');}
+ if(s&&s.kind!=='food'){P.killed[e.sp]=(P.killed[e.sp]||0)+1;if(e.sp==='egg')P.stats.eggs++;if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);pop(e.x,e.y+8,'+'+f.toFixed(0)+' биомассы','#e8c860');}
 }
 function steer(e,ang,dt,turn){let diff=((ang-e.a+Math.PI*3)%TAU)-Math.PI;const m=turn*dt;e.a+=clamp(diff,-m,m);}
 function updateEnts(dt){
  const pR=D.R;
+ const GRP={};orgCount=0;allyCount=0;
+ for(const e of ents){if(e.dead||e.eaten)continue;const s0=SP[e.sp];if(s0&&s0.kind!=='food')orgCount++;if(e.ally)allyCount++;
+  if(e.grp){const g=GRP[e.grp]||(GRP[e.grp]={x:0,y:0,hx:0,hy:0,n:0,alarm:0});g.x+=e.x;g.y+=e.y;g.hx+=Math.cos(e.a);g.hy+=Math.sin(e.a);g.n++;if(e.fleeT>0)g.alarm=1;}}
+ if(allyCount>P.stats.maxAllies)P.stats.maxAllies=allyCount;
  for(const e of ents){
   if(e.eaten){e.eaten+=dt*3;if(e.by&&!e.by.dead){e.x+=(e.by.x-e.x)*dt*4;e.y+=(e.by.y-e.y)*dt*4;}else if(!e.by){e.x+=(P.x-e.x)*dt*5;e.y+=(P.y-e.y)*dt*5;}continue;}
   e.t+=dt;const s=SP[e.sp];const fl=flow(e.x,e.y);
@@ -422,9 +443,18 @@ function updateEnts(dt){
    if(D.slime&&Math.hypot(e.x-P.x,e.y-P.y)<pR+25){e.x+=(P.x-e.x)*dt*2;e.y+=(P.y-e.y)*dt*2;}
    continue;}
   const dP=Math.hypot(e.x-P.x,e.y-P.y);
+  if(e.sp==='euglena'){
+   if(e.ally){e.orb=(e.orb==null?rnd(0,TAU):e.orb)+dt*0.35;const rr=pR+e.r+18;const tx=P.x+Math.cos(e.orb)*rr,ty=P.y+Math.sin(e.orb)*rr;const ddx=tx-e.x,ddy=ty-e.y,dl=Math.hypot(ddx,ddy)||1;const sp2=Math.min(dl*2.5,Math.max(s.spd,D.speed*1.2));
+    steer(e,Math.atan2(P.vy+ddy,P.vx+ddx),dt,4);e.x+=ddx/dl*sp2*dt;e.y+=ddy/dl*sp2*dt;e.vx=e.vy=0;gain(0.15*lightAt(e.x,e.y)*dt,true);if(e.hp<=0)killEnt(e);continue;}
+   const pslow=Math.hypot(P.vx,P.vy)<D.speed*0.45;
+   if(dP<pR+e.r+45&&pslow&&!(e.aggro>0)&&allyCount<maxAllies()&&P.inv<=0){e.bond=(e.bond||0)+dt;if(e.bond>=3){e.ally=true;e.bond=0;allyCount++;pop(e.x,e.y-e.r-8,'Симбионт!','#ffd47a');if(!P.hintsDone.ally){P.hintsDone.ally=1;toast('<b>Симбиоз!</b> Эвглена теперь плавает с тобой и делится биомассой на свету. Береги её от хищников.');}}}
+   else if(e.bond)e.bond=Math.max(0,e.bond-dt*0.6);
+  }
   let spd=s.spd*slow,wantA=null;
   // поведение
-  const flee=s.flee&&dP<e.r*5+pR*2&&pR>e.r*0.75;
+  let flee=s.flee&&dP<e.r*5+pR*2&&pR>e.r*0.75&&!(e.sp==='euglena'&&(e.bond>0||Math.hypot(P.vx,P.vy)<D.speed*0.45));
+  if(flee||(e.aggro>0&&e.grp))e.fleeT=1.5;else if(e.fleeT>0)e.fleeT-=dt;
+  if(!flee&&e.grp&&GRP[e.grp]&&GRP[e.grp].alarm&&dP<900)flee=true;
   if(s.beh==='hunt'||s.beh==='rotifer'){
    e.tgT-=dt;
    if(e.tgT<=0){e.tgT=0.5;e.tg=null;let bd=e.r*7+150;
@@ -449,10 +479,12 @@ function updateEnts(dt){
    const fx=Math.cos(e.a),fy=Math.sin(e.a),cx=e.x+fx*e.r*0.85,cy=e.y+fy*e.r*0.85;
    for(const o of ents){if(o.eaten||o===e||o.r>e.r*0.15)continue;const vx=cx-o.x,vy=cy-o.y,vl=Math.hypot(vx,vy);if(vl<e.r*0.9&&vl>1){o.x+=(vx/vl*40-vy/vl*25)*dt;o.y+=(vy/vl*40+vx/vl*25)*dt;if(vl<e.r*0.12){o.eaten=0.001;o.by=e;}}}
    if(pR<e.r*0.12){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy);if(vl<e.r*0.9){P.x+=(vx/vl*28-vy/vl*18)*dt;P.y+=(vy/vl*28+vx/vl*18)*dt;if(vl<e.r*0.15){deathCause='засосал трубач';hurt(20*dt,null);}}}
+  }else if(s.beh==='egg'){spd=0;
   }else if(s.beh==='trap'||s.beh==='drift'||s.beh==='roll'||s.beh==='glide'){
    e.wa+=rnd(-1,1)*dt*0.5;wantA=e.wa;
   }else{ // wander
    e.wa+=rnd(-1,1)*dt*1.4;wantA=e.wa;if(e.sp==='paramecium')e.spin=(e.spin||0)+dt*3;
+   const g=e.grp&&GRP[e.grp];if(g&&g.n>1){const cx=g.x/g.n,cy=g.y/g.n,cd=Math.hypot(cx-e.x,cy-e.y)||1;const vx=Math.cos(e.wa)*0.4+g.hx/g.n+(cx-e.x)/cd*Math.min(2,cd/70),vy=Math.sin(e.wa)*0.4+g.hy/g.n+(cy-e.y)/cd*Math.min(2,cd/70);wantA=Math.atan2(vy,vx);}
   }
   if(flee){wantA=Math.atan2(e.y-P.y,e.x-P.x);spd=s.spd*1.15*slow;}
   if(e.aggro>0&&s.flee){spd=s.spd*1.2;}
@@ -461,6 +493,13 @@ function updateEnts(dt){
   const tvx=Math.cos(e.a)*spd,tvy=Math.sin(e.a)*spd;const kk=Math.min(1,dt*3);e.vx+=(tvx-e.vx)*kk;e.vy+=(tvy-e.vy)*kk;
   const fk=s.beh==='sessile'?0:1;e.x+=(e.vx+fl[0]*fk)*dt;e.y+=(e.vy+fl[1]*fk)*dt;
   if(e.sp==='volvox')e.spin=(e.spin||0)+dt*0.4;
+  if(e.growTo&&e.r<e.growTo){e.r=Math.min(e.growTo,e.r+dt*1.6);e.maxHp=s.hp*(e.r/s.r[0])**1.2;e.hp=Math.min(e.maxHp,e.hp+dt*2);}
+  if(orgCount<orgCap()){
+   if(e.sp==='amoeba'&&e.r>115&&e.hp>e.maxHp*0.85&&R_()<dt/40){const nr=e.r*0.72;e.r=nr;e.maxHp=s.hp*(nr/s.r[0])**1.2;e.hp=e.maxHp;e.growTo=rnd(110,160);const b=spawnEnt('amoeba',e.x+nr*1.7*Math.cos(e.a+1.57),e.y+nr*1.7*Math.sin(e.a+1.57));b.r=nr;b.maxHp=e.maxHp;b.hp=b.maxHp;b.growTo=rnd(110,160);orgCount++;lifePop(e,'Амёба делится');}
+   else if(e.sp==='rotifer'&&e.r>=65&&R_()<dt/28){const eg=spawnEnt('egg',e.x-Math.cos(e.a)*e.r*1.3,e.y-Math.sin(e.a)*e.r*1.3);eg.t=0;orgCount++;lifePop(e,'Коловратка отложила яйцо');}
+   else if(e.sp==='volvox'&&e.r>150&&R_()<dt/45){const d2=spawnEnt('volvox',e.x+rnd(-1,1)*e.r*0.3,e.y+rnd(-1,1)*e.r*0.3);d2.r=rnd(40,55);d2.maxHp=s.hp*(d2.r/s.r[0])**1.2;d2.hp=d2.maxHp;d2.growTo=rnd(150,210);orgCount++;lifePop(e,'Вольвокс выпустил дочернюю колонию');}
+  }
+  if(e.sp==='egg'&&e.t>35){e.dead=true;const r2=spawnEnt('rotifer',e.x,e.y);r2.r=38;r2.maxHp=SP.rotifer.hp*(38/70)**1.2;r2.hp=r2.maxHp;r2.growTo=rnd(70,95);lifePop(e,'Из яйца вылупилась коловратка');continue;}
   if(e.hp<=0){killEnt(e);}
  }
  ents=ents.filter(e=>!(e.eaten>=1)&&!e.dead);
@@ -476,7 +515,7 @@ function collide(dt){
   if(e.sp==='heliozoa'&&dP<pR+e.r*2.1&&pR<e.r*1.6&&P.inv<=0){P.vx*=0.85;P.vy*=0.85;deathCause='прилип к солнечнику';hurt(2.5*dt,null);}
   const[cd,cw]=nearestCellDist(e.x,e.y);const ov=CELL_R+e.r-cd;
   if(ov<=0)continue;
-  if(e.sp==='kin'){continue;}
+  if(e.sp==='kin'||e.ally){continue;}
   if(!s||s.kind==='food'){eatEnt(e);continue;}
   // организм
   if(e.r<=pR*D.engulf){eatEnt(e);continue;}
@@ -622,6 +661,14 @@ const DRAW={
   ctx.strokeStyle=ST.hair(1);ctx.lineWidth=PX;ctx.beginPath();for(let k=0;k<40;k++){const an=k/40*TAU;const x=L*0.88+Math.cos(an)*L*0.09,y=Math.sin(an)*L*0.42;const w=Math.sin(an*3+t*9);ctx.moveTo(x,y);ctx.lineTo(x+L*0.08+w*L*0.03,y+Math.sin(an)*L*0.05);}ctx.stroke();
   mem(()=>ell(L*0.88,0,L*0.09,L*0.42),e.x,e.y,e.a,0.7);mem(body,e.x,e.y,e.a,0.85);
  },
+ egg(e,t){
+  const r=e.r,pr=Math.min(1,e.t/35);const path=()=>ell(0,0,r*1.3,r*0.9);
+  ctx.fillStyle=ST.cyto(45,1.6);path();ctx.fill();
+  ctx.fillStyle=ST.nuc(1.3);ell(0,0,r*1.05*(0.45+0.55*pr),r*0.65*(0.45+0.55*pr));ctx.fill();
+  granules(12,r*0.5*(0.5+0.5*pr),e.seed,t*0.3,ST.gran(0.6),r*0.08);
+  if(pr>0.5){ctx.fillStyle=ST.gran(1);circ(r*0.55,-r*0.15,r*0.07);ctx.fill();ctx.strokeStyle=ST.hair(0.8);ctx.lineWidth=PX*0.7;ctx.beginPath();for(let k=0;k<6;k++){const an=-0.8+k*0.32;ctx.moveTo(r*0.7+Math.cos(an)*r*0.15,Math.sin(an)*r*0.3);ctx.lineTo(r*0.8+Math.cos(an+Math.sin(t*10)*0.3)*r*0.3,Math.sin(an)*r*0.45);}ctx.stroke();}
+  mem(path,e.x,e.y,e.a,0.9,1.6);mem(()=>ell(0,0,r*1.15,r*0.78),e.x,e.y,e.a,0.4);
+ },
  tardigrade(e,t){
   const L=e.r,w=L*0.48;const body=()=>{ctx.beginPath();for(let i=0;i<=40;i++){const u=i/40*TAU;let rr=1+0.07*Math.cos(u*8);const x=Math.cos(u)*L*rr,y=Math.sin(u)*w*rr;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();};
   for(let i=0;i<4;i++){for(const sy of[-1,1]){const x=L*(0.55-i*0.38),ph=Math.sin(t*3+i*1.6+(sy>0?Math.PI:0));const lx=x+ph*L*0.08,ly=sy*w*1.25;ctx.fillStyle=ST.cyto(30,1.8);ell(lx,sy*w*0.95,L*0.1,w*0.32,0);ctx.fill();mem(()=>ell(lx,sy*w*0.95,L*0.1,w*0.32,0),e.x,e.y,e.a,0.7);ctx.strokeStyle=ST.mem(0.9);ctx.lineWidth=PX*1.2;ctx.beginPath();for(let c=-1;c<=1;c++){ctx.moveTo(lx,ly);ctx.lineTo(lx+c*L*0.05,ly+sy*L*0.08);}ctx.stroke();}}
@@ -742,6 +789,8 @@ function drawWorld(){
   if(e.eaten){const k=1-e.eaten;ctx.scale(k,k);ctx.globalAlpha=k;}
   if(e.r*cam.s<1.2&&SP[e.sp]&&SP[e.sp].kind==='food'){ctx.fillStyle=e.sp==='chlorella'?ST.chlo(0.8):ST.gran(0.9);ctx.fillRect(-PX,-PX,2*PX,2*PX);}
   else f(e,T);
+  if(e.bond>0){ctx.strokeStyle='rgba(255,210,90,0.9)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(0,0,e.r*1.25,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,e.bond/3));ctx.stroke();}
+  if(e.ally){ctx.strokeStyle='rgba(255,210,90,0.55)';ctx.lineWidth=1.2*PX;ctx.setLineDash([3*PX,3*PX]);circ(0,0,e.r*1.2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.globalAlpha=1;
  }
  // игрок
@@ -783,7 +832,7 @@ function updateCam(dt){
 const MODE_BTNS={};
 const MODE_DESC={bright:'Классика: свет сквозь прозрачные клетки',dark:'Чёрный фон, светятся контуры и реснички',phase:'Видно органеллы, светлые ореолы',fluo:'Ядра синие, хлорофилл красный'};
 MODE_KEYS.forEach((k,i)=>{const b=document.createElement('button');b.innerHTML='<b>'+(i+1)+' · '+MODES[k].ru+'</b><span>'+MODE_DESC[k]+'</span>';b.onclick=()=>setMode(k);$('modeBtns').appendChild(b);MODE_BTNS[k]=b;});
-function setMode(k){P.mode=k;ST=MODES[k];if(!ST.cytoP)ST.cytoP=(h,a)=>ST.cyto(h,a);for(const kk of MODE_KEYS)MODE_BTNS[kk].classList.toggle('on',kk===k);if(editorOpen)drawEditor();}
+function setMode(k){P.mode=k;if(P.modesSeen)P.modesSeen[k]=1;ST=MODES[k];if(!ST.cytoP)ST.cytoP=(h,a)=>ST.cyto(h,a);for(const kk of MODE_KEYS)MODE_BTNS[kk].classList.toggle('on',kk===k);if(editorOpen)drawEditor();}
 const FX_KEY='evo_stage1_fx';const FX={blur:true,ca:true,parts:true,vig:true};
 try{Object.assign(FX,JSON.parse(localStorage.getItem(FX_KEY)||'{}'));}catch(e){}
 const FX_RU={blur:'Размытые слои вне фокуса',ca:'Цветная кайма у краёв (хроматическая аберрация)',parts:'Броуновские частицы',vig:'Затемнение краёв поля (виньетка)'};
@@ -807,8 +856,8 @@ function hud(){
  $('bFinal').classList.toggle('hidden',D.n<GOAL_CELLS||!!P.kingdom);
  $('obj').textContent='Объектив ×'+OBJ[cam.obj].m+' · поле ≈ '+OBJ[cam.obj].d+' мкм';
  const target=Math.min(W,H)*0.16/cam.s;const L=niceLen(target);$('sbLine').style.width=(L*cam.s)+'px';$('sbText').textContent=L+' мкм';
- $('hint').innerHTML=currentHint();
- $('goal').innerHTML='<b>Цель уровня:</b> вырасти до '+GOAL_CELLS+' клеток и выбрать путь: животное, растение или гриб.<div class="bar" style="margin-top:5px"><i style="background:#7fb0ff;width:'+Math.min(100,D.n/GOAL_CELLS*100)+'%"></i></div><span class="muted">Видов открыто: '+Object.keys(P.seen).length+' / '+Object.keys(SP).filter(k=>SP[k].kind!=='food').length+' · время '+Math.floor(P.stats.time/60)+' мин</span>'+(P.kingdom?'<br><span style="color:#9fe0a8">Выбранный путь: '+KING[P.kingdom].ru+'</span>':'');
+ $('hint').innerHTML=currentHint();checkAch();
+ $('goal').innerHTML='<b>Цель уровня:</b> вырасти до '+GOAL_CELLS+' клеток и выбрать путь: животное, растение или гриб.<div class="bar" style="margin-top:5px"><i style="background:#7fb0ff;width:'+Math.min(100,D.n/GOAL_CELLS*100)+'%"></i></div><span class="muted">Видов открыто: '+SPECIES_KEYS.filter(k=>P.seen[k]).length+' / '+SPECIES_KEYS.length+(allyCount?' · симбионтов: '+allyCount:'')+' · время '+Math.floor(P.stats.time/60)+' мин</span>'+(P.kingdom?'<br><span style="color:#9fe0a8">Выбранный путь: '+KING[P.kingdom].ru+'</span>':'');
 }
 function currentHint(){
  const avail=NODES.some(n=>nodeState(n)==='avail'&&P.dna>=n.cost);
@@ -820,6 +869,7 @@ function currentHint(){
  if(P.biomass>=cellCost())return'Биомассы хватает на новую клетку — нарасти её в редакторе (E).';
  if(D.n>=6&&!hasN('spec'))return'Шесть клеток — можно открыть <b>Специализацию</b>: шаг к настоящему многоклеточному.';
  if(!D.cnt.spike&&!D.cnt.mouth&&!D.cnt.sting&&D.n>=3)return'Крупную добычу целиком не проглотить. Шипы, рот или стрекательные клетки помогут охотиться.';
+ if(!P.stats.maxAllies&&P.seen.euglena)return'Подплыви к зелёной эвглене медленно и задержись рядом на 3 секунды — она станет симбионтом.';
  return'1–4 — сменить метод микроскопии. Крупные хищники опасны, пока ты мельче их.';
 }
 let toastQ=[],toastT=0;function qtoast(h){toastQ.push(h);}
@@ -829,7 +879,7 @@ function toast(html){const d=document.createElement('div');d.className='toast pa
 const ecv=$('ecv'),ectx=ecv.getContext('2d');let tool='basic',eHover=null;
 function nodeState(n){if(P.un[n.id])return'owned';for(const r of n.req){const ok=r.split('|').some(x=>P.un[x]);if(!ok)return'locked';}if(n.minCells&&D.n<n.minCells)return'locked';return'avail';}
 function unlockedTypes(){const t=['basic'];for(const n of NODES)if(n.unlock&&P.un[n.id])t.push(n.unlock);return t;}
-function toggleEditor(){if(!started)return;editorOpen=!editorOpen;$('editor').classList.toggle('hidden',!editorOpen);if(editorOpen){paused=true;renderEditor();}else{paused=false;derive();save();}}
+function toggleEditor(){if(!started||pendingMut||achOpen||setOpen)return;editorOpen=!editorOpen;$('editor').classList.toggle('hidden',!editorOpen);if(editorOpen){paused=true;renderEditor();}else{paused=false;derive();save();}}
 function renderEditor(){
  $('eBm').textContent=Math.floor(P.biomass);$('eDna').textContent=P.dna;
  let h='',grp='';
@@ -913,18 +963,88 @@ function openFinal(){
 }
 function genName(){const a=['Proto','Micro','Hydro','Cyto','Gloeo','Volvo','Spiro','Chloro','Myco','Rhizo','Nemato'],b=['cellus','morpha','zoon','phyta','myces','plasma','sphaera','nema','coccus'];return pick(a)+pick(b)+' '+pick(['primus','gutta','artemii','minor','mirabilis','evolvens','novus']);}
 function chooseKingdom(k){
- P.kingdom=k;P.speciesName=genName();save();
+ P.kingdom=k;P.speciesName=genName();P.finishTime=P.stats.time;const run=recordRun();save();checkAch();
  const t=Math.round(P.stats.time/60);
- $('finalBox').innerHTML='<h1>'+P.speciesName+'</h1><div class="muted">Царство: <b style="color:#9fe0a8">'+KING[k].ru+'</b></div><div style="margin-top:10px">Клеток: '+D.n+' · поколений: '+P.gen+' · съедено: '+P.stats.eaten+' · побеждено: '+P.stats.kills+' · время: '+t+' мин · видов открыто: '+Object.keys(P.seen).length+'</div><div class="small muted" style="margin-top:10px">Уровень 1 пройден, результат сохранён. Следующий этап эволюции появится в новой версии, и твой выбор царства определит, каким он будет. А пока можно плавать дальше и расти без ограничений.</div><div style="margin-top:14px"><button class="on" id="fGo">Продолжить свободную игру</button></div>';
+ const prev=META.runs.slice(0,-1);let cmp='';if(prev.length){const bt=Math.min(...prev.map(r=>r.time)),bd=Math.min(...prev.map(r=>r.deaths));cmp='<div class="small" style="margin-top:8px">Сравнение с прошлыми существами: '+(run.time<bt?'<span class="best">новый рекорд времени!</span>':'лучшее время — '+fmtTime(bt))+' · '+(run.deaths<bd?'<span class="best">меньше всех смертей!</span>':'меньше всего смертей — '+bd)+'. Всего пройдено: '+META.runs.length+'.</div>';}
+ $('finalBox').innerHTML='<h1>'+P.speciesName+'</h1><div class="muted">Царство: <b style="color:#9fe0a8">'+KING[k].ru+'</b></div><div style="margin-top:10px">Клеток: '+D.n+' · поколений: '+P.gen+' · съедено: '+P.stats.eaten+' · побеждено: '+P.stats.kills+' · время: '+t+' мин · видов открыто: '+run.seen+'</div><div class="small" style="margin-top:6px">Состав тела: '+compText(D.cnt)+'</div>'+cmp+'<div class="small muted" style="margin-top:10px">Уровень 1 пройден, результат сохранён. Следующий этап эволюции появится в новой версии, и твой выбор царства определит, каким он будет. А пока можно плавать дальше и расти без ограничений.</div><div style="margin-top:14px"><button class="on" id="fGo">Продолжить свободную игру</button></div>';
  $('fGo').onclick=()=>{$('final').classList.add('hidden');setPause(false);};
 }
 $('bFinal').onclick=openFinal;
 
 /* ========== сохранение ========== */
 function save(){if(!started)return;try{localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,P:Object.assign({},P,{}),obj:cam.obj}));}catch(e){}}
-function load(){try{const s=localStorage.getItem(SAVE_KEY);if(!s)return false;const d=JSON.parse(s);if(d.v!==1)return false;P=Object.assign(newPlayer(),d.P);cam.obj=d.obj||0;return true;}catch(e){return false;}}
+function load(){try{const s=localStorage.getItem(SAVE_KEY);if(!s)return false;const d=JSON.parse(s);if(d.v!==1)return false;const np=newPlayer();P=Object.assign(np,d.P);P.stats=Object.assign(newPlayer().stats,d.P.stats||{});P.killed=P.killed||{};P.modesSeen=P.modesSeen||{};cam.obj=d.obj||0;return true;}catch(e){return false;}}
 setInterval(save,15000);addEventListener('beforeunload',save);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
+
+
+/* ========== мутация потомка ========== */
+let pendingMut=null;
+function freeSpots(){const set=new Set(P.cells.map(c=>c.q+','+c.r)),out=[];for(const c of P.cells)for(const[dq,dr]of HDIR){const k=(c.q+dq)+','+(c.r+dr);if(!set.has(k)){set.add(k);out.push([c.q+dq,c.r+dr]);}}return out;}
+function offerMutation(){
+ const av=NODES.filter(n=>nodeState(n)==='avail');let m=null;
+ if(av.length&&(R_()<0.55||!hasN('adhesion')))m={k:'node',n:pick(av)};
+ else if(hasN('adhesion')){const t=pick(unlockedTypes());const sp=pick(freeSpots());if(sp)m={k:'cell',t,q:sp[0],r:sp[1]};}
+ if(!m&&av.length)m={k:'node',n:pick(av)};
+ if(!m)return;
+ pendingMut=m;paused=true;
+ const what=m.k==='node'?'<b>«'+m.n.ru+'»</b> (бесплатно, без траты ДНК).<div class="small muted" style="margin-top:6px">'+m.n.desc+'</div>':'лишняя клетка <b>«'+TYPES[m.t].ru+'»</b> (бесплатно, без траты биомассы).<div class="small muted" style="margin-top:6px">'+TYPES[m.t].desc+' Она вырастет на случайном месте тела, потом её можно перестроить в редакторе.</div>';
+ $('mutBox').innerHTML='<h2>Потомок родился с мутацией</h2><div>Поколение '+P.gen+' унаследовало от предка всё тело, а вдобавок у него случайная мутация — '+what+'</div><div style="display:flex;gap:8px;margin-top:14px"><button class="on" id="mYes">Принять</button><button id="mNo">Отказаться</button></div>';
+ $('mutm').classList.remove('hidden');
+ $('mYes').onclick=()=>{const m2=pendingMut;if(m2.k==='node'){P.un[m2.n.id]=1;}else{P.cells.push({q:m2.q,r:m2.r,t:m2.t});}P.stats.mutAcc++;derive();P.hp=D.hpMax;closeMut();toast('Мутация закрепилась в роду.');};
+ $('mNo').onclick=closeMut;
+}
+function closeMut(){pendingMut=null;$('mutm').classList.add('hidden');paused=false;save();}
+
+/* ========== достижения и итоги ========== */
+const META_KEY='evo_stage1_meta';let META={ach:{},runs:[]};
+try{const m=JSON.parse(localStorage.getItem(META_KEY)||'{}');META.ach=m.ach||{};META.runs=m.runs||[];}catch(e){}
+function saveMeta(){try{localStorage.setItem(META_KEY,JSON.stringify(META));}catch(e){}}
+const SPECIES_KEYS=Object.keys(SP).filter(k=>SP[k].kind!=='food'&&!SP[k].notSpecies);
+const ACH=[
+ {id:'div1',ru:'Первое деление',d:'Поделиться впервые',t:()=>P.stats.div>=1},
+ {id:'colony',ru:'Вместе сильнее',d:'Открыть адгезию и стать колонией',t:()=>hasN('adhesion')},
+ {id:'cells10',ru:'Десяток',d:'Вырастить 10 клеток',t:()=>D.n>=10},
+ {id:'spec',ru:'Разделение труда',d:'Открыть специализацию клеток',t:()=>hasN('spec')},
+ {id:'cells30',ru:'Многоклеточное',d:'Вырастить 30 клеток',t:()=>D.n>=30},
+ {id:'k_animal',ru:'Путь зверя',d:'Выбрать царство животных',t:()=>P.kingdom==='animal'},
+ {id:'k_plant',ru:'Путь света',d:'Выбрать царство растений',t:()=>P.kingdom==='plant'},
+ {id:'k_fungus',ru:'Путь грибницы',d:'Выбрать царство грибов',t:()=>P.kingdom==='fungus'},
+ {id:'hunter',ru:'Охотник',d:'Победить 25 организмов',t:()=>P.stats.kills>=25},
+ {id:'glutton',ru:'Ненасытный',d:'Съесть 400 раз',t:()=>P.stats.eaten>=400},
+ {id:'explorer',ru:'Натуралист',d:'Увидеть все виды капли',t:()=>SPECIES_KEYS.every(k=>P.seen[k])},
+ {id:'egg',ru:'Яичница',d:'Съесть яйцо коловратки',t:()=>P.stats.eggs>=1},
+ {id:'symb',ru:'Симбиоз',d:'Подружиться с эвгленой',t:()=>P.stats.maxAllies>=1},
+ {id:'symb3',ru:'Свита',d:'Три симбионта одновременно',t:()=>P.stats.maxAllies>=3},
+ {id:'survivor',ru:'Живучий',d:'Прожить 10 минут без смерти',t:()=>P.stats.sinceDeath>=600},
+ {id:'amoeba',ru:'Амёбоборец',d:'Победить амёбу',t:()=>(P.killed.amoeba||0)>=1},
+ {id:'tardi',ru:'Укротитель медвежонка',d:'Победить тихоходку',t:()=>(P.killed.tardigrade||0)>=1},
+ {id:'mutant',ru:'Мутант',d:'Принять 3 мутации потомков',t:()=>P.stats.mutAcc>=3},
+ {id:'modes',ru:'Микроскопист',d:'Посмотреть всеми 4 методами',t:()=>Object.keys(P.modesSeen||{}).length>=4},
+ {id:'fast',ru:'Быстрая эволюция',d:'Пройти уровень быстрее 40 минут',t:()=>!!P.kingdom&&P.finishTime<40*60},
+ {id:'deathless',ru:'Бессмертный род',d:'Пройти уровень без единой смерти',t:()=>!!P.kingdom&&P.stats.deaths===0}
+];
+function checkAch(){for(const a of ACH){if(META.ach[a.id])continue;let ok=false;try{ok=a.t();}catch(e){}if(ok){META.ach[a.id]=Date.now();saveMeta();qtoast('Достижение: <b>'+a.ru+'</b> — '+a.d);}}}
+function fmtTime(s){s=Math.round(s);return Math.floor(s/60)+' мин '+String(s%60).padStart(2,'0')+' с';}
+function recordRun(){
+ const run={name:P.speciesName,kingdom:P.kingdom,cells:D.n,time:P.stats.time,deaths:P.stats.deaths,gen:P.gen,kills:P.stats.kills,eaten:P.stats.eaten,seen:Object.keys(P.seen).filter(k=>SPECIES_KEYS.includes(k)).length,allies:P.stats.maxAllies,comp:Object.assign({},D.cnt),date:Date.now()};
+ META.runs.push(run);saveMeta();return run;
+}
+function compText(c){return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([t,n])=>TYPES[t].ru.toLowerCase()+' '+n).join(', ');}
+let achOpen=false,achWasPaused=false;
+function toggleAch(){if(editorOpen||setOpen)return;achOpen=!achOpen;$('achm').classList.toggle('hidden',!achOpen);if(achOpen){achWasPaused=paused;paused=true;renderAch();}else paused=started?achWasPaused:true;}
+function renderAch(){
+ const got=ACH.filter(a=>META.ach[a.id]).length;
+ let h='<div class="grp" style="margin-top:4px">Текущее существо</div><div class="small">'+(started?('Поколение '+P.gen+' · клеток '+D.n+' · время '+fmtTime(P.stats.time)+' · смертей '+P.stats.deaths+' · побеждено '+P.stats.kills+' · съедено '+P.stats.eaten+' · симбионтов (макс.) '+P.stats.maxAllies+' · видов '+Object.keys(P.seen).filter(k=>SPECIES_KEYS.includes(k)).length+' / '+SPECIES_KEYS.length):'игра не начата')+'</div>';
+ h+='<div class="grp">Мои существа (пройденные уровни)</div>';
+ if(!META.runs.length)h+='<div class="small muted">Пока пусто. Дорасти до '+GOAL_CELLS+' клеток и выйди из капли — существо попадёт сюда.</div>';
+ else{const bt=Math.min(...META.runs.map(r=>r.time)),bd=Math.min(...META.runs.map(r=>r.deaths)),bk=Math.max(...META.runs.map(r=>r.kills));
+  h+='<div style="overflow:auto"><table class="runs"><tr><th>#</th><th>Существо</th><th>Царство</th><th>Время</th><th>Смерти</th><th>Поколений</th><th>Побеждено</th><th>Видов</th><th>Состав тела</th></tr>'+
+  META.runs.map((r,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+r.name+'</b></td><td>'+KING[r.kingdom].ru+'</td><td class="'+(r.time===bt?'best':'')+'">'+fmtTime(r.time)+'</td><td class="'+(r.deaths===bd?'best':'')+'">'+r.deaths+'</td><td>'+r.gen+'</td><td class="'+(r.kills===bk?'best':'')+'">'+r.kills+'</td><td>'+r.seen+'</td><td class="muted">'+compText(r.comp)+'</td></tr>').join('')+'</table></div><div class="small muted">Зелёным отмечены лучшие результаты.</div>';}
+ h+='<div class="grp">Достижения: '+got+' / '+ACH.length+'</div><div class="achs">'+ACH.map(a=>'<div class="ach '+(META.ach[a.id]?'yes':'no')+'"><b>'+a.ru+'</b>'+a.d+'</div>').join('')+'</div>';
+ $('achBody').innerHTML=h;
+}
+$('bAch').onclick=toggleAch;$('aClose').onclick=toggleAch;
 
 /* ========== пауза, старт ========== */
 function setPause(v,silent){paused=v;$('pause').classList.toggle('hidden',!v||!!silent||editorOpen);}
@@ -962,7 +1082,7 @@ function frame(now){
  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__G={get P(){return P},get D(){return D},get ents(){return ents},cam,setMode,begin,openFinal,toggleEditor};
+window.__G={spawnEnt,get META(){return META},playerDie:()=>{deathCause='тест';playerDie();},get P(){return P},get D(){return D},get ents(){return ents},cam,setMode,begin,openFinal,toggleEditor};
 })();
 
 </script>

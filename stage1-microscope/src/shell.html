@@ -75,22 +75,22 @@ table.runs th{color:#8a94a8;font-weight:500}.best{color:#9fe0a8;font-weight:600}
 <body>
 <canvas id="cv"></canvas>
 <div id="hud" class="panel">
- <div class="t" id="hTitle">Поколение 1</div>
+ <div class="t" id="hTitle">Поколение 1</div><div id="defTxt" class="small" style="color:#ff9a8a;margin:-2px 0 4px"></div>
  <div class="lbl"><span>Здоровье</span><span id="hpTxt"></span></div><div class="bar"><i id="hpBar"></i></div>
  <div class="lbl"><span id="bmLbl">Биомасса</span><span id="bmTxt"></span></div><div class="bar"><i id="bmBar"></i></div>
  <div class="lbl"><span>Клеток: <b id="cellTxt">1</b> / 30</span><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span></div>
- <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bAch">Итоги</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bAch">Итоги</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bZap" class="hidden">Разряд (Q)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
 </div>
 <div id="scale"><div id="sbLine"></div><span id="sbText"></span><div id="obj"></div></div>
 <div id="toasts"></div>
 <div id="hint" class="panel"></div>
 <div id="goal" class="panel"></div>
-<div id="touch"><button id="tDash">Рывок</button><button id="tEdit">Эволюция</button></div>
+<div id="touch"><button id="tZap" class="hidden">Разряд</button><button id="tDash">Рывок</button><button id="tEdit">Эволюция</button></div>
 
 <div id="start" class="modal"><div class="box" style="max-width:560px">
  <h1>Эволюция · Уровень 1</h1>
  <div class="muted">Капля прудовой воды под микроскопом. Ты — одна-единственная клетка. Ешь, делись, открывай мутации и собери из клеток своё первое многоклеточное тело. Что получится на выходе — животное, растение или гриб — решаешь ты.</div>
- <div class="small muted" style="margin-top:10px">Управление: мышь (плыви за курсором) или WASD/стрелки, на телефоне веди пальцем. E — эволюция, Пробел — рывок, 1–4 — метод микроскопии, P — пауза.</div>
+ <div class="small muted" style="margin-top:10px">Управление: мышь (плыви за курсором) или WASD/стрелки, на телефоне веди пальцем. E — эволюция, Пробел — рывок, Q — разряд (редкий орган), 1–4 — метод микроскопии, P — пауза.</div>
  <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="on" id="bNew" style="padding:9px 18px;font-size:15px">Новая игра</button><button id="bCont" class="hidden" style="padding:9px 18px;font-size:15px">Продолжить</button></div>
 </div></div>
 

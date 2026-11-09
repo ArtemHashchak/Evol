@@ -71,9 +71,10 @@ function preyFor(e){
  return best;
 }
 function steer(e,dt,tx,ty,tz,spd){
- const st=e.st,da=angD(Math.atan2(ty-e.y,tx-e.x),e.a);e.a+=clamp(da,-st.turn*dt*1.3,st.turn*dt*1.3);
- const f=Math.max(0.2,Math.cos(Math.min(Math.abs(da),1.5)));const v=spd*f;
- e.x+=Math.cos(e.a)*v*dt;e.y+=Math.sin(e.a)*v*dt;e.z+=clamp(tz-e.z,-Math.max(4,v)*dt*0.8,Math.max(4,v)*dt*0.8);
+ const st=e.st,dx=tx-e.x,dz=tz-e.z,dist=Math.hypot(dx,dz);if(dist<0.5)spd=0;
+ const da=angD(Math.atan2(dz,dx),e.a);e.a+=clamp(da,-st.turn*dt*1.3,st.turn*dt*1.3);
+ const f=Math.max(0.25,Math.cos(Math.min(Math.abs(da),1.5)));const v=Math.min(spd*f,dist*3+0.5);
+ e.x+=Math.cos(e.a)*v*dt;e.z+=Math.sin(e.a)*v*dt;e.y=0;
  e.mv+=(clamp(spd/(st.speed||1),0,1.2)-e.mv)*Math.min(1,dt*3);
 }
 function entUpdate(e,dt){
@@ -82,14 +83,14 @@ function entUpdate(e,dt){
  const crawler=S.beh==='graze'||S.beh==='kin';
  const cspd=crawler?Math.max(st.crawl,st.speed*0.55):st.speed;
  let tx=e.wx,ty=e.wy,tz=e.wz,spd=cspd*0.35;
- const newWander=(rad,zf)=>{const a=R_()*TAU,d=rnd(rad*0.3,rad);e.wx=clamp(e.x+Math.cos(a)*d,-HALF*0.92,HALF*0.92);e.wy=clamp(e.y+Math.sin(a)*d,-HALF*0.92,HALF*0.92);e.wz=zf(e.wx,e.wy);};
+ const newWander=(rad,zf)=>{const a=R_()*TAU,d=rnd(rad*0.3,rad);e.wx=clamp(e.x+Math.cos(a)*d,-HALF*0.92,HALF*0.92);e.wy=0;e.wz=zf(e.wx,e.wy);};
  if(Math.hypot(e.wx-e.x,e.wy-e.y)<st.L+3||e.t%17<dt)newWander(st.L*8+60,crawler?(x,y)=>floorH(x,y)+st.Req*0.55:(x,y)=>{const f=floorH(x,y);return f+rnd(8,Math.min(160,SURF-f-10));});
  if(e.curl>0){e.mv*=0.9;updateChain(e.b,e.pos,e.x,e.y,e.z);return;}
  if(S.beh==='graze'||S.beh==='school'){
   if(e.scan<=0){e.scan=0.3+R_()*0.2;e.thr=threatTo(e);}
   if(e.thr&&!e.thr.gone&&(e.thr!==P||P.alive)){const th=e.thr,dx=e.x-th.x,dy=e.y-th.y,d=Math.hypot(dx,dy)||1;tx=e.x+dx/d*80;ty=e.y+dy/d*80;tz=crawler?floorZ:clamp(e.z+(e.z-th.z)*0.5,fz+4,SURF-6);spd=cspd*1.05;e.state='flee';
    if(S.curl&&d<th.st.L*0.8+st.L&&R_()<dt*1.5){e.curl=3;}}
-  else{e.state='idle';if(S.beh==='school'&&e.lead&&!e.lead.gone&&e.lead!==e){tx=e.lead.x+e.ox;ty=e.lead.y+e.oy;tz=e.lead.z+e.oz;spd=Math.min(cspd,e.lead.st.speed*0.4+Math.hypot(tx-e.x,ty-e.y)*0.6);}
+  else{e.state='idle';if(S.beh==='school'&&e.lead&&!e.lead.gone&&e.lead!==e){tx=e.lead.x+e.ox;ty=e.lead.y+e.oy;tz=e.lead.z+e.oz;spd=Math.min(cspd,e.lead.st.speed*0.4+Math.hypot(tx-e.x,tz-e.z)*0.6);}
    if(S.scav){let bc=null,bd=st.L*6+50;for(const c of carr){const d=Math.hypot(c.x-e.x,c.y-e.y);if(d<bd){bd=d;bc=c;}}if(bc){tx=bc.x;ty=bc.y;tz=floorZ;spd=cspd*0.6;if(bd<st.L*0.6+bc.r){bc.val-=dt*st.M*0.4;}}}}
   if(crawler)tz=floorZ;
  }else if(S.beh==='hunt'){
@@ -116,8 +117,8 @@ function entUpdate(e,dt){
   const d=Math.hypot(P.x-e.x,P.y-e.y);if(e.mate&&P.alive&&d<P.st.L*10&&d>P.st.L*1.5){tx=P.x;ty=P.y;spd=cspd*0.5;}tz=floorZ;
   if(e.leave>0){e.leave-=dt;if(e.leave<=0){e.gone=true;}}
  }else if(S.beh==='pack'){
-  const k=ents.filter(o=>o.S.beh==='pack').indexOf(e);const ang=P.a+Math.PI+(k-1.5)*0.6,off=P.st.L*(1.6+0.5*(k%3));
-  tx=P.x+Math.cos(ang)*off;ty=P.y+Math.sin(ang)*off;tz=P.z;const d=Math.hypot(tx-e.x,ty-e.y);spd=Math.min(st.speed*1.15,d*1.5+2);
+  const k=ents.filter(o=>o.S.beh==='pack').indexOf(e);const off=P.st.L*(1.3+0.6*(k%3));
+  tx=P.x-Math.cos(P.a)*off;ty=0;tz=clamp(P.z-Math.sin(P.a)*off+((k%3)-1)*P.st.L*0.7,floorH(tx)+st.Req,SURF-4);const d=Math.hypot(tx-e.x,tz-e.z);spd=Math.min(st.speed*1.15,d*1.5+2);
   if(e.scan<=0){e.scan=0.4;e.tgt=null;let bd=P.st.L*4+40;for(const o of ents){if(o.S.kin||o.hid||o.gone)continue;let ok=false;if(P.st.brain>=3&&o.S.beh==='hunt'&&o.tgt===P&&o.st.Req<st.Req*2.5)ok=true;else if(o.st.Req<st.Req*0.8&&o.S.beh!=='drift')ok=true;if(!ok)continue;const dd=d3(o,e);if(dd<bd){bd=dd;e.tgt=o;}}}
   if(e.tgt&&!e.tgt.gone){const tg=e.tgt;tx=tg.x;ty=tg.y;tz=tg.z;spd=st.speed;const dd=d3(e.pos[0],tg);if(dd<headR(e)*1.3+tg.st.Req*0.8+1.5&&e.cd<=0){e.cd=0.8;tg.hp-=st.bite*(tg.st.armor||1);tg.dmgT=2;if(tg.hp<=0||tg.st.Req<=st.Req*st.swallow){const v=entVal(tg);killEnt(tg,null,true);gainFood(v*0.35,null,true);}}}
   if(e.hp<e.st.hpMax)e.hp=Math.min(e.st.hpMax,e.hp+dt*0.5);
@@ -140,23 +141,23 @@ function popTick(dt){
  for(let i=ents.length-1;i>=0;i--){const e=ents[i];if(e.gone){ents.splice(i,1);continue;}if(e.S.beh!=='pack'&&Math.hypot(e.x-P.x,e.y-P.y)>ACT*1.7){ents.splice(i,1);}}
  const want=48+Math.min(30,P.st.L*0.4);let n=ents.filter(e=>!e.S.kin).length;let guard=0;
  while(n<want&&guard++<6){
-  const a=R_()*TAU,d=rnd(vr*1.05,ACT);const x=clamp(P.x+Math.cos(a)*d,-HALF*0.9,HALF*0.9),y=clamp(P.y+Math.sin(a)*d,-HALF*0.9,HALF*0.9);
+  const a=R_()*TAU,d=rnd(vr*1.05,ACT);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;
   const sp=pickSpecies(zoneAt(x,y));const S=SPEC[sp];
-  if(S.beh==='school'){const sc=sizeFor(S),k=4+((R_()*6)|0);const lead=spawnEnt(sp,x,y,sc);lead.lead=lead;for(let q=1;q<k;q++){const e=spawnEnt(sp,x+rnd(-15,15),y+rnd(-15,15),sc*rnd(0.85,1.1));e.lead=lead;e.ox=rnd(-1,1)*lead.st.L*2.5;e.oy=rnd(-1,1)*lead.st.L*2.5;e.oz=rnd(-1,1)*lead.st.L;e.z=lead.z+e.oz;e.pos=initChain(e.b,e.x,e.y,e.z,e.a);}n+=k;}
+  if(S.beh==='school'){const sc=sizeFor(S),k=4+((R_()*6)|0);const lead=spawnEnt(sp,x,y,sc);lead.lead=lead;for(let q=1;q<k;q++){const e=spawnEnt(sp,x+rnd(-15,15),0,sc*rnd(0.85,1.1));e.lead=lead;e.ox=rnd(-1,1)*lead.st.L*2.5;e.oy=rnd(-1,1)*lead.st.L*2.5;e.oz=rnd(-1,1)*lead.st.L;e.z=lead.z+e.oz;e.pos=initChain(e.b,e.x,e.y,e.z,e.a);}n+=k;}
   else{spawnEnt(sp,x,y,sizeFor(S));n++;}
  }
  // сородичи
- const kin=ents.filter(e=>e.sp==='kin');if(kin.length<2&&R_()<dt*0.4){const a=R_()*TAU,d=rnd(vr*1.05,vr*1.6);const x=clamp(P.x+Math.cos(a)*d,-HALF*0.9,HALF*0.9),y=clamp(P.y+Math.sin(a)*d,-HALF*0.9,HALF*0.9);const b=cloneBody(P.body);scaleBody(b,rnd(0.85,1.05));const e=spawnEnt('kin',x,y,1,{body:b,un:P.un});e.mate=true;}
+ const kin=ents.filter(e=>e.sp==='kin');if(kin.length<2&&R_()<dt*0.4){const a=R_()*TAU,d=rnd(vr*1.05,vr*1.6);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;const b=cloneBody(P.body);scaleBody(b,rnd(0.85,1.05));const e=spawnEnt('kin',x,y,1,{body:b,un:P.un});e.mate=true;}
  // планктон
  for(let i=foods.length-1;i>=0;i--){const f=foods[i];if(f.dead||Math.hypot(f.x-P.x,f.y-P.y)>ACT*1.5)foods.splice(i,1);}
- const wf=90;let g2=0;while(foods.length<wf&&g2++<12){const a=R_()*TAU,d=rnd(foods.length<wf*0.5?20:vr*0.9,ACT);const x=P.x+Math.cos(a)*d,y=P.y+Math.sin(a)*d;const fz=floorH(x,y);const zz=clamp(P.z+rnd(-80,80),fz+3,SURF-4);if(R_()<0.25+0.75*(zz/SURF))addPlankton(x,y,zz);}
+ const wf=90;let g2=0;while(foods.length<wf&&g2++<12){const a=R_()*TAU,d=rnd(foods.length<wf*0.5?20:vr*0.9,ACT);const x=P.x+Math.cos(a)*d,y=0;const fz=floorH(x);const zz=clamp(P.z+rnd(-90,90)*Math.max(1,vr/120),fz+3,SURF-4);if(R_()<0.25+0.75*(zz/SURF))addPlankton(x,y,zz);}
  for(let i=carr.length-1;i>=0;i--){const c=carr[i];c.t+=dt;const fz=floorH(c.x,c.y)+c.r*0.4;if(c.z>fz)c.z=Math.max(fz,c.z-dt*12);if(c.val<=0.3||c.t>120||Math.hypot(c.x-P.x,c.y-P.y)>ACT*2)carr.splice(i,1);}
 }
 /* ===== отрисовка особых существ ===== */
 function drawEnt(e){
  const S=e.S,st=e.st,s=cam.s;const fz=floorH(e.x,e.y);
  if(e.z-fz>st.Req*1.5&&!e.hid)drawShadow(e.x,e.y,e.z,st.Req*1.1);
- if(S.custom==='ostracod'){const p=proj(e.x,e.y,e.z),r=st.Req*s*1.1,ang=Math.atan2(Math.sin(e.a)*0.5+Math.cos(e.a)*0.5,Math.cos(e.a)*0.866-Math.sin(e.a)*0.866);ctx.save();ctx.translate(p[0],p[1]);ctx.rotate(ang);ctx.strokeStyle=`hsla(${e.b.hue},40%,70%,0.8)`;ctx.lineWidth=Math.max(0.6,r*0.08);for(const sd of[-1,1]){ctx.beginPath();ctx.moveTo(r*0.8,sd*r*0.1);ctx.quadraticCurveTo(r*1.4,sd*r*0.6,r*1.6+Math.sin(e.t*12)*r*0.2,sd*r*(0.9));ctx.stroke();}ctx.fillStyle=`hsla(${e.b.hue},45%,62%,0.85)`;ctx.beginPath();ctx.ellipse(0,0,r,r*0.68,0,0,TAU);ctx.fill();ctx.strokeStyle=`hsla(${e.b.hue},40%,30%,0.9)`;ctx.stroke();ctx.beginPath();ctx.moveTo(-r,0);ctx.quadraticCurveTo(0,-r*0.2,r,0);ctx.stroke();ctx.fillStyle='rgba(30,20,20,0.9)';ctx.beginPath();ctx.arc(r*0.55,-r*0.15,Math.max(0.8,r*0.13),0,TAU);ctx.fill();ctx.restore();}
+ if(S.custom==='ostracod'){const p=proj(e.x,e.y,e.z),r=st.Req*s*1.1;ctx.save();ctx.translate(p[0],p[1]);const fl=Math.cos(e.a)<0?-1:1;ctx.scale(fl,1);ctx.rotate(-Math.atan2(Math.sin(e.a),Math.abs(Math.cos(e.a))));ctx.strokeStyle=`hsla(${e.b.hue},40%,70%,0.8)`;ctx.lineWidth=Math.max(0.6,r*0.08);for(const sd of[-1,1]){ctx.beginPath();ctx.moveTo(r*0.8,sd*r*0.1);ctx.quadraticCurveTo(r*1.4,sd*r*0.6,r*1.6+Math.sin(e.t*12)*r*0.2,sd*r*(0.9));ctx.stroke();}ctx.fillStyle=`hsla(${e.b.hue},45%,62%,0.85)`;ctx.beginPath();ctx.ellipse(0,0,r,r*0.68,0,0,TAU);ctx.fill();ctx.strokeStyle=`hsla(${e.b.hue},40%,30%,0.9)`;ctx.stroke();ctx.beginPath();ctx.moveTo(-r,0);ctx.quadraticCurveTo(0,-r*0.2,r,0);ctx.stroke();ctx.fillStyle='rgba(30,20,20,0.9)';ctx.beginPath();ctx.arc(r*0.55,-r*0.15,Math.max(0.8,r*0.13),0,TAU);ctx.fill();ctx.restore();}
  else if(S.custom==='cteno'){const p=proj(e.x,e.y,e.z),r=st.Req*s;ctx.fillStyle='rgba(200,230,255,0.13)';ctx.strokeStyle='rgba(220,240,255,0.45)';ctx.lineWidth=Math.max(0.6,r*0.04);ctx.beginPath();ctx.ellipse(p[0],p[1],r*0.75,r*1.15,0,0,TAU);ctx.fill();ctx.stroke();for(let k=0;k<8;k++){const ox=Math.sin(k/8*TAU)*r*0.68;if(Math.cos(k/8*TAU)<-0.2)continue;for(let q=0;q<9;q++){const yy=-r*0.95+q*r*0.24,wx=ox*Math.sqrt(Math.max(0,1-(yy/(r*1.15))**2));const hu=(T_*200+q*40+k*45)%360;ctx.fillStyle=`hsla(${hu},90%,65%,${0.55*(0.5+0.5*Math.sin(T_*9-q*0.8+k))})`;ctx.fillRect(p[0]+wx-r*0.04,p[1]+yy,Math.max(1,r*0.08),Math.max(1,r*0.09));}}ctx.fillStyle='rgba(255,180,120,0.35)';ctx.beginPath();ctx.ellipse(p[0],p[1],r*0.15,r*0.5,0,0,TAU);ctx.fill();}
  else if(S.custom==='glass'){const p=proj(e.x,e.y,e.z),r=st.Req*s;const dk=clamp(1-e.z/SURF,0,1);ctx.strokeStyle=`rgba(210,240,255,${0.65-0.3*dk})`;ctx.lineWidth=Math.max(0.6,r*0.05);ctx.beginPath();for(let k=0;k<16;k++){const a=k/16*TAU+e.t*0.3,l=r*(1.1+0.6*hash(k,e.id));ctx.moveTo(p[0]+Math.cos(a)*r*0.4,p[1]+Math.sin(a)*r*0.3);ctx.lineTo(p[0]+Math.cos(a)*l,p[1]+Math.sin(a)*l*0.75);}ctx.stroke();ctx.fillStyle=`rgba(190,230,255,${0.16})`;ctx.beginPath();ctx.arc(p[0],p[1],r*0.5,0,TAU);ctx.fill();ctx.fillStyle=`rgba(120,255,220,${0.5+0.4*Math.sin(e.t*3)})`;ctx.beginPath();ctx.arc(p[0],p[1],Math.max(1,r*0.12),0,TAU);ctx.fill();}
  else if(S.custom==='priap'){const p=proj(e.x,e.y,fz),r=st.Req*s;if(e.hid){ctx.fillStyle='rgba(60,50,35,0.45)';ctx.beginPath();ctx.ellipse(p[0],p[1],r*1.2,r*0.55,0,0,TAU);ctx.fill();ctx.fillStyle='rgba(230,200,150,0.7)';for(let k=0;k<10;k++){const a=k/10*TAU;ctx.beginPath();ctx.arc(p[0]+Math.cos(a)*r*0.55,p[1]+Math.sin(a)*r*0.25,Math.max(0.6,r*0.07),0,TAU);ctx.fill();}}

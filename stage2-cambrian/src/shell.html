@@ -26,8 +26,18 @@ button:disabled{opacity:.4;cursor:default}
 .toast b{color:#ffe08a}
 @keyframes fade{0%{opacity:0;transform:translateY(-6px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
 #goal{position:fixed;right:10px;top:10px;width:260px;font-size:12px}
-#vert{position:fixed;right:12px;bottom:80px;display:flex;flex-direction:column;gap:8px}
-#vert button{width:58px;height:50px;border-radius:12px;font-size:12px}
+#joy{position:fixed;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(200,235,255,.35);background:rgba(10,30,45,.25);display:none;pointer-events:none;z-index:5}
+#knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(200,235,255,.45);box-shadow:0 0 12px rgba(160,220,255,.4)}
+#mob{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));display:none;flex-direction:column;align-items:flex-end;gap:10px;z-index:6}
+#mob button{width:64px;height:64px;border-radius:50%;font-size:11.5px;padding:0;background:rgba(14,40,58,.82);border-color:rgba(120,190,230,.45)}
+#mob button.big{width:78px;height:78px;font-size:12.5px}#mob button.on{background:#1f5a86}
+#mPause{width:46px!important;height:46px!important}
+body.touch #mob{display:flex}body.touch #hudBtns{display:none}body.touch #hint{bottom:auto;top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:42%;max-width:52vw;font-size:12px}
+body.touch #info{display:none}
+body.touch #hud{width:min(46vw,210px);font-size:11px;line-height:1.3;padding:6px 8px;top:max(8px,env(safe-area-inset-top));left:8px}
+body.touch #hud .t{font-size:12px;margin-bottom:2px}body.touch .lbl{font-size:10.5px}
+body.touch #toasts{top:auto;bottom:calc(150px + env(safe-area-inset-bottom));width:min(78vw,420px)}
+@media (max-width:760px){#toasts{width:78vw}.toast{font-size:12px}#hud{padding:6px 9px}#hud .bar{height:6px;margin:1px 0 3px}.box{padding:12px}#editor .box{padding:10px}.tree{max-height:32vh}#ecv{height:30vh}}
 .modal{position:fixed;inset:0;background:rgba(2,8,14,.84);display:flex;align-items:center;justify-content:center;z-index:20}
 .box{background:#0c1a26;border:1px solid #23415a;border-radius:14px;padding:20px 24px;max-width:min(1000px,96vw);max-height:94vh;overflow:auto}
 .box h1{margin:0 0 6px;font-size:26px;font-weight:600}
@@ -77,17 +87,18 @@ input[type=range]{width:100%}
 <div id="info"></div>
 <div id="toasts"></div>
 <div id="hint" class="panel"></div>
-<div id="vert"><button id="bUp">↑ вверх</button><button id="bDown">↓ вниз</button></div>
+<div id="joy"><div id="knob"></div></div>
+<div id="mob"><button id="mFinal" class="hidden on">Финал</button><button id="mPack" class="hidden">Стая</button><button id="mBur" class="hidden">Нора</button><button id="mEgg" class="hidden">Яйца</button><button id="mEdit" class="big">Эволюция</button><button id="mPause">❚❚</button></div>
 
 <div id="start" class="modal"><div class="box" style="max-width:640px">
  <h1>Эволюция · Уровень 2</h1>
- <div class="muted">Кембрийский океан, 520 миллионов лет назад. Жизнь только что «взорвалась» разнообразием: глаза, панцири, челюсти, первые хищники. Твоё многоклеточное стало крошечным червячком на дне. Расти, отращивай органы, размножайся и выбери, кем станут твои потомки: позвоночными, членистоногими или моллюсками.</div>
+ <div class="muted">Кембрийский океан, 520 миллионов лет назад — вид в разрезе, как в документальном фильме. Жизнь только что «взорвалась» разнообразием: глаза, панцири, челюсти, первые хищники. Твоё многоклеточное стало крошечным червячком на дне. Расти, отращивай органы, размножайся и выбери, кем станут твои потомки: позвоночными, членистоногими или моллюсками.</div>
  <div class="grp" style="margin-top:14px">Каким будет план тела?</div>
  <div class="cards" style="grid-template-columns:1fr 1fr;margin-top:6px">
   <div class="card on" data-sym="bilateral" id="symB"><h3>Двусторонняя симметрия</h3><div class="small muted">Червячок из сегментов: голова, хвост, левая и правая сторона. Линия человека — путь к позвоночным, членистоногим и моллюскам.</div></div>
   <div class="card" data-sym="radial" id="symR"><h3>Радиальная симметрия</h3><div class="small muted">Медуза: колокол и щупальца по кругу. Красивая, но эволюционный тупик — путь книдарий.</div></div>
  </div>
- <div class="small muted" style="margin-top:10px">Управление: мышь — плыть за курсором (по горизонтали), WASD — тоже; Пробел — вверх, Shift — вниз. E — эволюция, R — отложить яйца рядом с партнёром, B — закопаться, P — пауза.</div>
+ <div class="small muted" style="margin-top:10px">Управление: на компьютере — плыть за курсором мыши или WASD (Пробел/Shift тоже вверх/вниз); E — эволюция, R — яйца рядом с партнёром, B — закопаться, P — пауза. На телефоне — джойстик там, где коснёшься экрана, и круглые кнопки справа.</div>
  <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="on" id="bNew" style="padding:9px 18px;font-size:15px">Новая игра</button><button id="bCont" class="hidden" style="padding:9px 18px;font-size:15px">Продолжить</button></div>
  <div class="small muted" id="lvl1info" style="margin-top:8px"></div>
 </div></div>

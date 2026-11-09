@@ -4,12 +4,12 @@ function newPlayer(sym,seed){return{sym,seed,body:defaultBody(sym),un:{},st:null
 let P=newPlayer('bilateral',1);P.st=bodyStats(P.body,P.un);
 const GOAL=()=>P.sym==='radial'?24:60;
 function lenMM(){return P.sym==='radial'?P.body.segs[0].r*2:P.st.L;}
-function camScale(){return Math.min(W,H)/(Math.max(P.st.L*(P.sym==='radial'?2.2:1),10)*9);}
+function camScale(){return Math.min(W,H)/(Math.max(P.st.L*(P.sym==='radial'?2.2:1),10)*(touchUI&&Math.min(W,H)<500?6.5:8.5));}
 function refreshStats(){const r=P.st&&P.st.hpMax?P.hp/P.st.hpMax:1;P.st=bodyStats(P.body,P.un);P.hp=clamp(r,0.05,1)*P.st.hpMax;cam.ts=camScale();}
-function findSpawn(){for(let k=0;k<400;k++){const x=-1400+rnd(-700,700),y=-1400+rnd(-700,700);if(floorH(x,y)>370&&floorType(x,y)!=='rock')return[x,y];}return[-1400,-1400];}
-function placePlayer(x,y){P.x=x;P.y=y;P.z=floorH(x,y)+P.st.Req*0.7;P.vx=P.vy=P.vz=0;P.pos=initChain(P.body,P.x,P.y,P.z,P.a);cam.x=P.x;cam.y=P.y;cam.z=P.z;cam.s=cam.ts;camUpdate(P.x,P.y,P.z,1);}
+function findSpawn(){for(let k=0;k<400;k++){const x=rnd(-2200,-1500);if(floorH(x)>370&&floorType(x)!=='rock')return[x,0];}return[-1800,0];}
+function placePlayer(x,y){P.x=x;P.y=y;P.z=floorH(x,y)+P.st.Req*0.7;P.y=0;P.vx=P.vy=P.vz=0;P.pos=initChain(P.body,P.x,0,P.z,P.a);cam.s=cam.ts;cam.x=P.x;cam.z=P.z;camUpdate(P.x,0,P.z,1);}
 /* ===== ввод ===== */
-const keys={},mouse={x:0,y:0,on:false},vert={up:false,down:false};
+const keys={},mouse={x:0,y:0,on:false};
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]=true;if(e.code==='Space')e.preventDefault();
  if(e.repeat)return;
  if(e.code==='KeyE'){edOpen?closeEditor():openEditor();}
@@ -17,12 +17,19 @@ addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]
  else if(e.code==='KeyP'||e.code==='Escape'){if(edOpen)closeEditor();else if(!$('start').classList.contains('hidden'))return;else setPause(!paused);}});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
-cv.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;mouse.on=true;});
+cv.addEventListener('mousemove',e=>{if(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents)return;mouse.x=e.clientX;mouse.y=e.clientY;mouse.on=true;if(touchUI&&!matchMedia('(pointer:coarse)').matches)setTouchUI(false);});
 cv.addEventListener('mouseleave',()=>{mouse.on=false;});
-cv.addEventListener('touchstart',e=>{const t=e.touches[0];mouse.x=t.clientX;mouse.y=t.clientY;mouse.on=true;e.preventDefault();},{passive:false});
-cv.addEventListener('touchmove',e=>{const t=e.touches[0];mouse.x=t.clientX;mouse.y=t.clientY;e.preventDefault();},{passive:false});
-cv.addEventListener('touchend',()=>{mouse.on=false;});
-for(const[id,k]of[['bUp','up'],['bDown','down']]){const b=$(id);b.addEventListener('pointerdown',e=>{vert[k]=true;e.preventDefault();});for(const ev of['pointerup','pointerleave','pointercancel'])b.addEventListener(ev,()=>{vert[k]=false;});}
+/* джойстик для сенсорных экранов */
+let touchUI=matchMedia('(pointer:coarse)').matches;const joy={on:false,id:null,ox:0,oy:0,x:0,y:0};
+function setTouchUI(v){touchUI=v;document.body.classList.toggle('touch',v);}setTouchUI(touchUI);
+const JR=58;
+function joyShow(){const j=$('joy');j.style.display=joy.on?'block':'none';if(joy.on){j.style.left=joy.ox+'px';j.style.top=joy.oy+'px';$('knob').style.transform=`translate(${joy.x*JR}px,${joy.y*JR}px)`;}}
+cv.addEventListener('touchstart',e=>{if(!touchUI)setTouchUI(true);for(const t of e.changedTouches){if(joy.id===null){joy.id=t.identifier;joy.on=true;joy.ox=t.clientX;joy.oy=t.clientY;joy.x=joy.y=0;joyShow();}}e.preventDefault();},{passive:false});
+cv.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===joy.id){let dx=(t.clientX-joy.ox)/JR,dy=(t.clientY-joy.oy)/JR;const l=Math.hypot(dx,dy);if(l>1){// база «тянется» за пальцем
+   joy.ox+=(dx/l)*(l-1)*JR;joy.oy+=(dy/l)*(l-1)*JR;dx/=l;dy/=l;}joy.x=Math.abs(dx)<0.12&&Math.abs(dy)<0.12?0:dx;joy.y=Math.abs(dx)<0.12&&Math.abs(dy)<0.12?0:dy;joyShow();}e.preventDefault();},{passive:false});
+const joyEnd=e=>{for(const t of e.changedTouches)if(t.identifier===joy.id){joy.id=null;joy.on=false;joy.x=joy.y=0;joyShow();}};
+cv.addEventListener('touchend',joyEnd);cv.addEventListener('touchcancel',joyEnd);
+for(const[id,fn]of[['mEdit',()=>openEditor()],['mEgg',()=>layEggs()],['mBur',()=>toggleBurrow()],['mPack',()=>togglePack()],['mFinal',()=>openFinal()],['mPause',()=>setPause(true)]])$(id).addEventListener('click',fn);
 $('bEdit').onclick=()=>openEditor();$('bEgg').onclick=()=>layEggs();$('bBur').onclick=()=>toggleBurrow();$('bPack').onclick=()=>togglePack();$('bFinal').onclick=()=>openFinal();$('bResume').onclick=()=>setPause(false);
 /* ===== сообщения ===== */
 function toast(h){const d=document.createElement('div');d.className='toast panel';d.innerHTML=h;$('toasts').appendChild(d);setTimeout(()=>d.remove(),6500);while($('toasts').children.length>4)$('toasts').firstChild.remove();}
@@ -98,26 +105,25 @@ function toggleBurrow(){if(!P.alive||edOpen)return;if(P.bur){P.bur=false;return;
 function playerUpdate(dt){
  const st=P.st;P.time+=dt;P.eggCd-=dt;P.bcd-=dt;P.inv-=dt;P.hit-=dt;
  const fz=floorH(P.x,P.y),minZ=fz+st.Req*0.55;
- let dx=0,dy=0;const kW=keys.KeyW||keys.ArrowUp,kS=keys.KeyS||keys.ArrowDown,kA=keys.KeyA||keys.ArrowLeft,kD=keys.KeyD||keys.ArrowRight;
- if(kW){dx-=1;dy-=1;}if(kS){dx+=1;dy+=1;}if(kD){dx+=1;dy-=1;}if(kA){dx-=1;dy+=1;}
- if(dx||dy){const l=Math.hypot(dx,dy);dx/=l;dy/=l;}
- else if(mouse.on&&!edOpen){const[wx,wy]=screenToWorld(mouse.x,mouse.y,P.z);let ex=wx-P.x,ey=wy-P.y;const d=Math.hypot(ex,ey),dead=Math.max(1.5,st.L*0.45);if(d>dead){const k=Math.min(1,(d-dead)/(st.L*2.5+4));dx=ex/d*k;dy=ey/d*k;}}
- const vin=((keys.Space||vert.up)?1:0)-((keys.ShiftLeft||keys.ShiftRight||vert.down)?1:0);
- if(P.bur){if(dx||dy||vin)P.bur=false;else{P.z+=(fz-st.Req*0.1-P.z)*Math.min(1,dt*3);P.mv=0;}}
+ let dx=0,dz=0;const kW=keys.KeyW||keys.ArrowUp||keys.Space,kS=keys.KeyS||keys.ArrowDown||keys.ShiftLeft||keys.ShiftRight,kA=keys.KeyA||keys.ArrowLeft,kD=keys.KeyD||keys.ArrowRight;
+ if(kW)dz+=1;if(kS)dz-=1;if(kD)dx+=1;if(kA)dx-=1;
+ if(dx||dz){const l=Math.hypot(dx,dz);dx/=l;dz/=l;}
+ else if(joy.on){dx=joy.x;dz=-joy.y;}
+ else if(mouse.on&&!edOpen&&!touchUI){const[wx,wz]=screenToWorld(mouse.x,mouse.y);const ex=wx-P.x,ez=wz-P.z;const d=Math.hypot(ex,ez),dead=Math.max(1.5,st.L*0.45);if(d>dead){const k=Math.min(1,(d-dead)/(st.L*2.5+4));dx=ex/d*k;dz=ez/d*k;}}
+ if(P.bur){if(Math.hypot(dx,dz)>0.3)P.bur=false;else{P.z+=(fz-st.Req*0.1-P.z)*Math.min(1,dt*3);P.mv=0;}}
  if(!P.bur){
   const near=P.z-minZ<st.Req*1.6;let spd=near&&st.crawl>st.speed?st.crawl:st.speed;
   if(P.o2<0.15)spd*=0.6;if(P.sat<0.08)spd*=0.8;
   if(P.sym==='radial')spd*=0.45+0.75*Math.max(0,Math.sin(P.time*5));
   const k=Math.min(1,dt*(P.sym==='radial'?2.5:4.5));
-  P.vx+=(dx*spd-P.vx)*k;P.vy+=(dy*spd-P.vy)*k;
-  const sink=(P.body.skel==='exo'||P.body.skel==='shell')?-4:-0.7;
-  P.vz+=((vin?vin*Math.max(6,spd*0.7):sink)-P.vz)*k;
-  P.x=clamp(P.x+P.vx*dt,-HALF*0.95,HALF*0.95);P.y=clamp(P.y+P.vy*dt,-HALF*0.95,HALF*0.95);P.z+=P.vz*dt;
-  const mz=floorH(P.x,P.y)+st.Req*0.55;if(P.z<mz){P.z=mz;if(P.vz<0)P.vz=0;}if(P.z>SURF-3){P.z=SURF-3;if(P.vz>0)P.vz=0;}
-  const sp2=Math.hypot(P.vx,P.vy);if(sp2>0.6){const da=angD(Math.atan2(P.vy,P.vx),P.a);P.a+=clamp(da,-st.turn*dt*1.7,st.turn*dt*1.7);}
-  P.mv=clamp(Math.hypot(P.vx,P.vy,P.vz)/(st.speed||1),0,1.2);
+  const sink=(P.body.skel==='exo'||P.body.skel==='shell')?-5:-0.6;
+  P.vx+=(dx*spd-P.vx)*k;P.vz+=((Math.abs(dz)>0.05?dz*spd:sink)-P.vz)*k;
+  P.x=clamp(P.x+P.vx*dt,-HALF*0.95,HALF*0.95);P.y=0;P.z+=P.vz*dt;
+  const mz=floorH(P.x)+st.Req*0.55;if(P.z<mz){P.z=mz;if(P.vz<0)P.vz=0;}if(P.z>SURF-3){P.z=SURF-3;if(P.vz>0)P.vz=0;}
+  const sp2=Math.hypot(P.vx,P.vz);if(sp2>0.6){let want=Math.atan2(P.vz,P.vx);if(near&&st.crawl>0&&Math.abs(P.vz)<sp2*0.5)want=P.vx>=0?0:Math.PI;const da=angD(want,P.a);P.a+=clamp(da,-st.turn*dt*1.7,st.turn*dt*1.7);}
+  P.mv=clamp(sp2/(st.speed||1),0,1.2);
  }
- if(P.body.sym!=='radial'&&(P.body.skel==='none'||P.body.skel==='notochord')&&P.mv>0.05){const w=Math.sin(P.time*8)*P.body.segs[0].r*0.25*P.mv;updateChain(P.body,P.pos,P.x-Math.sin(P.a)*w,P.y+Math.cos(P.a)*w,P.z);}else updateChain(P.body,P.pos,P.x,P.y,P.z);
+ if(P.body.sym!=='radial'&&(P.body.skel==='none'||P.body.skel==='notochord')&&P.mv>0.05){const w=Math.sin(P.time*8)*P.body.segs[0].r*0.25*P.mv;updateChain(P.body,P.pos,P.x-Math.sin(P.a)*w,0,P.z+Math.cos(P.a)*w);}else updateChain(P.body,P.pos,P.x,P.y,P.z);
  // кислород
  const skin=0.75/(1+st.M/60),absorb=o2At(P.z)*(skin+Math.min(1.5,st.gill*0.17));
  const need=(P.bur?0.15:0.28+0.22*P.mv)+0.05*Math.log2(1+st.M/10);
@@ -127,8 +133,8 @@ function playerUpdate(dt){
  P.sat=Math.max(0,P.sat-dt*st.met*(1+0.6*P.mv));if(P.sat<=0){P.hp-=dt*st.hpMax*0.03;P.lastHit='';}
  if(P.sat>0.3&&P.o2>0.3)P.hp=Math.min(st.hpMax,P.hp+dt*st.hpMax*0.02);
  // еда
- if(!P.bur){const h=P.pos[0],hr=P.body.segs[0].r,fx=Math.cos(P.a),fy=Math.sin(P.a);const rad=P.sym==='radial';
-  const mx=h.x+(rad?0:fx*hr*0.8),my=h.y+(rad?0:fy*hr*0.8),mz=h.z-(rad?hr*0.6:0);
+ if(!P.bur){const h=P.pos[0],hr=P.body.segs[0].r,fx=Math.cos(P.a),fz2=Math.sin(P.a);const rad=P.sym==='radial';
+  const mx=h.x+(rad?0:fx*hr*0.8),my=0,mz=h.z+(rad?-hr*0.6:fz2*hr*0.8);
   const pr=hr*1.2+1.5+(st.c.tentacle?st.Req*0.7:0)+(rad?st.Req*0.8:0);
   for(const f of foods){if(f.dead)continue;if(Math.abs(f.x-mx)<pr&&Math.abs(f.y-my)<pr&&Math.abs(f.z-mz)<pr){f.dead=1;gainFood(f.val);}}
   if(P.bcd<=0){
@@ -200,19 +206,19 @@ function buyNode(id){const n=NODE[id];if(P.un[id])return;if(!n.req.every(r=>P.un
 $('ecv').addEventListener('click',e=>{const r=$('ecv').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let bi=-1,bd=1e9;edPts.forEach((p,i)=>{const d=Math.hypot(p[0]-x,p[1]-y)-p[2];if(d<bd){bd=d;bi=i;}});if(bi>=0&&bd<40){edSel=bi;renderEditor();}});
 function drawEd(){
  const c=$('ecv'),w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;if(edSize[0]!==w||edSize[1]!==h){edSize=[w,h];c.width=w*DPR;c.height=h*DPR;}
- const ec=c.getContext('2d');const sv=[ctx,W,H,cam.s,cam.u,cam.v];ctx=ec;W=w;H=h;
- const b=P.body,n=b.segs.length,a=-Math.PI/4,z=1000;const pos=[];let x=0,y=0;
- for(let i=0;i<n;i++){pos.push({x,y,z});const r1=b.segs[i].r,r2=b.segs[i+1]?b.segs[i+1].r:r1;x-=Math.cos(a)*(r1+r2)*0.8;y-=Math.sin(a)*(r1+r2)*0.8;}
- const L=b.sym==='radial'?b.segs[0].r*4.2:P.st.L+b.segs[0].r*4.5;cam.s=Math.min(w/(L*1.05),h/(L*0.75));
- const mx=(pos[0].x+pos[n-1].x)/2+Math.cos(a)*b.segs[0].r*1.2,my=(pos[0].y+pos[n-1].y)/2+Math.sin(a)*b.segs[0].r*1.2;cam.u=(mx-my)*C30;cam.v=(mx+my)*0.5-z+(b.sym==='radial'?b.segs[0].r*1.2:0);
+ const ec=c.getContext('2d');const sv=[ctx,W,H,cam.s,cam.x,cam.z];ctx=ec;W=w;H=h;
+ const b=P.body,n=b.segs.length,z=1000;const pos=[];let x=0;
+ for(let i=0;i<n;i++){pos.push({x,y:0,z});const r1=b.segs[i].r,r2=b.segs[i+1]?b.segs[i+1].r:r1;x-=(r1+r2)*0.8;}
+ const r0=b.segs[0].r;const L=b.sym==='radial'?r0*4.2:P.st.L+r0*5;cam.s=Math.min(w/(L*1.1),h/(L*0.62));
+ cam.x=b.sym==='radial'?0:(pos[0].x+pos[n-1].x)/2+r0*0.9;cam.z=b.sym==='radial'?z-r0*1.3:z;const a=0;
  ctx.setTransform(DPR,0,0,DPR,0,0);const g=ctx.createRadialGradient(w/2,h/2,10,w/2,h/2,Math.max(w,h)*0.7);g.addColorStop(0,'#0f3346');g.addColorStop(1,'#061722');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
  ctx.strokeStyle='rgba(120,180,220,0.06)';ctx.lineWidth=1;for(let q=0;q<w;q+=24){ctx.beginPath();ctx.moveTo(q,0);ctx.lineTo(q,h);ctx.stroke();}for(let q=0;q<h;q+=24){ctx.beginPath();ctx.moveTo(0,q);ctx.lineTo(w,q);ctx.stroke();}
- drawBody(b,pos,{t:T_,moving:0.35,heading:a,xray:true,brain:P.st.brain,gut:P.gut});
+ drawBody(b,pos,{t:T_,moving:0.35,heading:a,xray:true,brain:P.st.brain,gut:P.gut,light:1});
  edPts=pos.map((p,i)=>{const q=proj(p.x,p.y,p.z);return[q[0],q[1],b.segs[i].r*cam.s];});
  const sp=edPts[edSel];if(sp){ctx.strokeStyle='rgba(255,220,120,0.9)';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(sp[0],sp[1],sp[2]*1.35+4,sp[2]*1.2+4,0,0,TAU);ctx.stroke();ctx.setLineDash([]);}
  ctx.fillStyle='rgba(200,220,235,0.6)';ctx.font='11px system-ui';if(b.sym!=='radial')edPts.forEach((p,i)=>ctx.fillText(i+1,p[0]-3,p[1]+p[2]*1.2+14));
- ctx.fillText(b.sym==='radial'?'вид сверху-сбоку':'голова →',w-70,h-10);
- [ctx,W,H,cam.s,cam.u,cam.v]=sv;
+ ctx.fillText(b.sym==='radial'?'вид сбоку':'голова →',w-70,h-10);
+ [ctx,W,H,cam.s,cam.x,cam.z]=sv;
 }
 /* ===== финал ===== */
 const PATHS=[
@@ -248,12 +254,13 @@ function hud(dt){hudT-=dt;if(hudT>0)return;hudT=0.12;const st=P.st;
  $('bEgg').classList.toggle('hidden',!ents.some(e=>e.sp==='kin'&&e.mate)&&!P.eggsLaid);$('bBur').classList.toggle('hidden',!P.un.burrow);$('bBur').classList.toggle('on',P.bur);
  $('bPack').classList.toggle('hidden',!packMax());$('bPack').classList.toggle('on',P.packOn);$('bPack').textContent=`Стая: ${P.packOn?'вкл':'выкл'}`;
  $('bFinal').classList.toggle('hidden',lenMM()<GOAL()||P.done);
+ for(const[m,bn]of[['mEgg','bEgg'],['mBur','bBur'],['mPack','bPack'],['mFinal','bFinal']]){$(m).classList.toggle('hidden',$(bn).classList.contains('hidden'));$(m).classList.toggle('on',$(bn).classList.contains('on'));}
  const zn=zoneAt(P.x,P.y),dep=((SURF-P.z)/10).toFixed(0);$('info').innerHTML=`<b>${ZONES[zn].ru}</b> · глубина ${dep} м · ${floorTypeRu()}${P.bur?' · <b>закопан</b>':''}`;
  const G=[[P.foodCount>=5,'Поешь: планктон, мелкие рачки, водорослевые маты'],[P.flags.edit,'Открой «Эволюцию» (E) и измени тело'],[P.eggsLaid>0,'Найди сородича ♥ и отложи яйца (R)'],[P.st.gill>0&&P.zones.deep,'Отрасти жабры и спустись в Тёмную впадину'],[lenMM()>=GOAL(),`Вырасти до ${GOAL()} мм (${lenMM().toFixed(1)})`],[P.done,'Выбери путь развития']];
  const nx=G.findIndex(g=>!g[0]);$('goal').innerHTML=`<div class="t" style="font-weight:600;margin-bottom:4px">Цели этапа</div>`+G.map((g,i)=>`<div style="color:${g[0]?'#7fd09f':i===nx?'#ffe08a':'#8aa0b0'}">${g[0]?'✓':i===nx?'▸':'·'} ${g[1]}</div>`).join('')+`<div class="meter"><i style="width:${clamp(lenMM()/GOAL(),0,1)*100}%"></i></div><div class="small muted">Видов в рационе: ${Object.keys(P.eaten).length}/${Object.keys(SPEC).length} · Время: ${Math.floor(P.time/60)} мин</div>`;
  hints();}
 function floorTypeRu(){return{sand:'песок',mud:'ил',rock:'скалы',mat:'водорослевый мат'}[floorType(P.x,P.y)];}
-const HINTS=[[()=>P.time<14,'Плыви за курсором мыши или WASD. Пробел — вверх, Shift — вниз. Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<40&&P.bm>=8&&!P.flags.edit,'Накопились питательные вещества — нажми <b>E</b>: добавь сегмент или увеличь тело.'],[()=>ents.some(e=>e.sp==='kin'&&e.mate&&d3(e,P)<P.st.L*6+30)&&!P.eggsLaid,'Рядом сородич с ♥. Подплыви вплотную и нажми <b>R</b>, чтобы отложить яйца: потомки — это запасные жизни.'],[()=>P.o2<0.35,'Кислорода мало: поднимись выше (Пробел). Жабры позволяют дышать глубже.'],[()=>lenMM()>=GOAL()&&!P.done,'Ты достаточно вырос — нажми «Завершить этап», чтобы выбрать путь развития.']];
+const HINTS=[[()=>P.time<14&&touchUI,'Коснись экрана и веди пальцем — это джойстик. Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<14,'Плыви за курсором мыши или WASD (W/Пробел — вверх, S/Shift — вниз). Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<40&&P.bm>=8&&!P.flags.edit,touchUI?'Накопились питательные вещества — нажми «Эволюция»: добавь сегмент или увеличь тело.':'Накопились питательные вещества — нажми <b>E</b>: добавь сегмент или увеличь тело.'],[()=>ents.some(e=>e.sp==='kin'&&e.mate&&d3(e,P)<P.st.L*6+30)&&!P.eggsLaid,'Рядом сородич с ♥. Подплыви вплотную и нажми <b>R</b>, чтобы отложить яйца: потомки — это запасные жизни.'],[()=>P.o2<0.35,'Кислорода мало: поднимись выше (Пробел). Жабры позволяют дышать глубже.'],[()=>lenMM()>=GOAL()&&!P.done,'Ты достаточно вырос — нажми «Завершить этап», чтобы выбрать путь развития.']];
 function hints(){const h=HINTS.find(q=>q[0]());$('hint').style.display=h?'':'none';if(h)$('hint').innerHTML=h[1];}
 /* ===== отрисовка ===== */
 function drawArrows(){const list=[];
@@ -261,18 +268,14 @@ function drawArrows(){const list=[];
  for(const n of nests)if(n.own&&n.eggs)list.push([n,'rgba(255,230,140,0.9)']);
  for(const[o,c]of list){const p=proj(o.x,o.y,o.z);if(p[0]>20&&p[0]<W-20&&p[1]>20&&p[1]<H-20)continue;const a=Math.atan2(p[1]-H/2,p[0]-W/2);const r=Math.min(W,H)*0.44;const x=W/2+Math.cos(a)*Math.min(r*1.4,W/2-24),y=H/2+Math.sin(a)*Math.min(r,H/2-24);ctx.fillStyle=c;ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-6,-7);ctx.lineTo(-3,0);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();ctx.restore();}}
 function render(dt){
- ctx.setTransform(DPR,0,0,DPR,0,0);const dk=clamp(cam.z/SURF,0,1);
- const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,`rgb(${(10+30*dk)|0},${(40+70*dk)|0},${(60+70*dk)|0})`);g.addColorStop(1,`rgb(${(3+12*dk)|0},${(14+40*dk)|0},${(24+50*dk)|0})`);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
- drawFloor();ctx.setTransform(DPR,0,0,DPR,0,0);
- const vr=viewR()*1.3,list=[];
- for(const d of decor)if(Math.abs(d.x-cam.x)<vr&&Math.abs(d.y-cam.y)<vr)list.push([d.x+d.y,0,d]);
- for(const n of nests)list.push([n.x+n.y,1,n]);for(const c of carr)list.push([c.x+c.y,2,c]);
- for(const e of ents)if(!e.gone&&Math.abs(e.x-cam.x)<vr&&Math.abs(e.y-cam.y)<vr)list.push([e.x+e.y,3,e]);
- if(P.alive)list.push([P.x+P.y,4,P]);
- list.sort((a,b)=>a[0]-b[0]);
- for(const f of foods)drawFood(f);
- for(const[,k,o]of list){if(k===0)drawDecor(o);else if(k===1)drawNest(o);else if(k===2)drawCarrion(o);else if(k===3)drawEnt(o);else drawPlayer();}
- drawSnow(dt);drawRays(cam.z);const pp=proj(P.x,P.y,P.z);drawDark(pp[0],pp[1],cam.z,P.st.eyeQ);drawArrows();
+ drawWater();drawParallax();drawRays();drawFloorBack();drawFloorFront();ctx.setTransform(DPR,0,0,DPR,0,0);
+ const vr=viewR()*1.25;
+ let k0=0;for(;k0<decor.length&&decor[k0].l<1;k0++){const d=decor[k0];if(Math.abs(d.x-cam.x)<vr)drawDecor(d);}
+ for(const n of nests)drawNest(n);for(const c of carr)drawCarrion(c);for(const f of foods)drawFood(f);
+ const list=ents.filter(e=>!e.gone&&Math.abs(e.x-cam.x)<vr).sort((a,b)=>b.st.Req-a.st.Req);
+ for(const e of list)drawEnt(e);if(P.alive)drawPlayer();
+ for(let k=k0;k<decor.length;k++){const d=decor[k];if(Math.abs(d.x-cam.x)<vr)drawDecor(d);}
+ drawSnow(dt);const pp=proj(P.x,0,P.z);drawDark(pp[0],pp[1],cam.z,P.st.eyeQ);drawArrows();
  if(P.hit>0){ctx.fillStyle=`rgba(200,30,30,${P.hit*0.5})`;ctx.fillRect(0,0,W,H);}
  if(P.o2<0.25&&P.alive){const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.7);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,`rgba(10,20,60,${(0.25-P.o2)*2.4})`);ctx.fillStyle=v;ctx.fillRect(0,0,W,H);}
 }
@@ -305,6 +308,6 @@ function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
  else T_+=dt*0.5;
  cam.ts=camScale();camUpdate(P.x,P.y,P.z,dt);render(dt);if(edOpen)drawEd();hud(dt);
  requestAnimationFrame(frame);}
-genWorld(7);genDecor(7);P.st=bodyStats(P.body,P.un);placePlayer(-1400,-1400);
+genWorld(7);genDecor(7);P.st=bodyStats(P.body,P.un);placePlayer(-1800,0);
 requestAnimationFrame(frame);
 window.__G={get P(){return P;},ents,foods,nests,carr,SPEC,begin,openEditor,closeEditor,tryEdit,buyNode,cam,openFinal,layEggs};

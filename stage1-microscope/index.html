@@ -289,6 +289,12 @@ const SP={
 
 /* ========== стили методов микроскопии ========== */
 const MODES={
+ dic:{ru:'Рельеф (ДИК)',bg0:'#a7a8a3',bg1:'#7c7e79',glow:0,dark:0,memW:1.15,reliefGran:1,
+  relief:{hi:a=>`rgba(250,251,246,${a*0.95})`,lo:a=>`rgba(22,24,22,${a*0.6})`},
+  mem:a=>`rgba(70,72,68,${a*0.55})`,cyto:(h,a)=>`hsla(${h},18%,64%,${a*0.22})`,nuc:a=>`rgba(120,80,170,${a*0.42})`,nucRim:a=>`rgba(70,40,120,${a*0.75})`,
+  gran:a=>`rgba(48,46,44,${a*0.6})`,chlo:a=>`rgba(55,150,45,${a*0.9})`,mito:a=>`rgba(200,110,40,${a*0.6})`,vac:a=>`rgba(235,238,232,${a*0.6})`,vacRim:a=>`rgba(40,42,40,${a*0.55})`,
+  hair:a=>`rgba(235,238,232,${a*0.55})`,part:a=>`rgba(60,62,58,${a})`,eye:a=>`rgba(225,55,30,${a})`,caR:a=>`rgba(255,40,0,${a*0.08})`,caB:a=>`rgba(0,90,255,${a*0.08})`,
+  stain:(h,a)=>`hsla(${h},65%,45%,${a})`,memP:(h,a)=>`rgba(70,72,68,${a*0.55})`,light:'rgba(255,255,255,0.12)',vig:'rgba(40,42,40,0.5)',spike:a=>`rgba(40,42,40,${a*0.8})`},
  bright:{ru:'Светлое поле',bg0:'#efede6',bg1:'#cdc8b9',glow:0,dark:0,memW:0.9,relief:{hi:a=>`rgba(255,255,252,${a*0.75})`,lo:a=>`rgba(40,38,30,${a*0.28})`},
   mem:a=>`rgba(55,58,40,${a})`,cyto:(h,a)=>`hsla(${h},20%,60%,${a*0.12})`,nuc:a=>`rgba(95,90,75,${a*0.16})`,nucRim:a=>`rgba(60,58,44,${a*0.65})`,
   gran:a=>`rgba(60,56,42,${a*0.45})`,chlo:a=>`rgba(80,150,50,${a*0.7})`,mito:a=>`rgba(130,105,60,${a*0.45})`,vac:a=>`rgba(255,255,248,${a*0.55})`,vacRim:a=>`rgba(90,88,70,${a*0.45})`,
@@ -310,7 +316,7 @@ const MODES={
   hair:a=>`rgba(70,255,130,${a*0.35})`,part:a=>`rgba(90,255,150,${a*0.55})`,eye:a=>`rgba(255,200,60,${a})`,caR:a=>`rgba(255,40,80,${a*0.4})`,caB:a=>`rgba(60,90,255,${a*0.4})`,
   stain:(h,a)=>`hsla(${h},100%,60%,${a*0.6})`,memP:(h,a)=>`hsla(${h},100%,62%,${a*0.75})`,light:'rgba(40,60,90,0.10)',vig:'rgba(0,0,0,0.8)',spike:a=>`rgba(140,255,180,${a*0.7})`}
 };
-const MODE_KEYS=['bright','dark','phase','fluo'];
+const MODE_KEYS=['dic','bright','dark','phase','fluo'];
 let ST=MODES.bright;
 
 /* ========== состояние ========== */
@@ -318,7 +324,7 @@ const SAVE_KEY='evo_stage1_v1';
 let P,D={},ents=[],parts=[],farObj=[],nearObj=[],lights=[],slime=[],pops=[],shots=[];
 let T=0,cam={x:0,y:0,s:1,ts:1,obj:0,trans:0},paused=true,editorOpen=false,started=false;
 function newPlayer(){return{x:0,y:0,a:0,vx:0,vy:0,hp:10,cells:[{q:0,r:0,t:'basic'}],hue:150,pattern:'none',biomass:0,dna:0,dnaF:0,gen:1,un:{},
- dashT:0,dashCd:0,stingCd:0,inv:2,hurt:0,lastHit:99,mode:'bright',kingdom:null,stats:{time:0,eaten:0,kills:0,div:0,deaths:0,eggs:0,mutAcc:0,sinceDeath:0,maxAllies:0,spores:0,cured:0,cycSurv:0},seen:{},ate:{},killed:{},modesSeen:{},slimeT:0,hintsDone:{},defects:{},defT:0,cystCd:0,zapCd:0,sporeSeed:(Math.random()*1e9)|0,sporesOpen:{},bossDone:{}};}
+ dashT:0,dashCd:0,stingCd:0,inv:2,hurt:0,lastHit:99,mode:'dic',kingdom:null,stats:{time:0,eaten:0,kills:0,div:0,deaths:0,eggs:0,mutAcc:0,sinceDeath:0,maxAllies:0,spores:0,cured:0,cycSurv:0},seen:{},ate:{},killed:{},modesSeen:{},slimeT:0,hintsDone:{},defects:{},defT:0,cystCd:0,zapCd:0,sporeSeed:(Math.random()*1e9)|0,sporesOpen:{},bossDone:{}};}
 
 /* ========== тело ========== */
 const DEFECTS={limp:{ru:'Вялый жгутик',d:'−40% тяги жгутиков'},thin:{ru:'Тонкая мембрана',d:'−20% здоровья'},slowdig:{ru:'Медленное пищеварение',d:'−25% биомассы от еды'},shaky:{ru:'Дрожащие реснички',d:'−30% поворота'}};
@@ -553,7 +559,7 @@ addEventListener('keydown',e=>{
  if(e.code==='KeyQ'){doZap();}
  if(e.code==='KeyR'){tryInfest();}
  if(e.code==='KeyP'||e.code==='Escape'){if(pendingMut)return;if(achOpen)toggleAch();else if(setOpen)toggleSettings();else if(editorOpen)toggleEditor();else if(started)setPause(!paused);}
- const mi=['Digit1','Digit2','Digit3','Digit4'].indexOf(e.code);if(mi>=0&&!editorOpen)setMode(MODE_KEYS[mi]);
+ const mi=['Digit1','Digit2','Digit3','Digit4','Digit5'].indexOf(e.code);if(mi>=0&&!editorOpen)setMode(MODE_KEYS[mi]);
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 cv.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;mouse.on=true;if(e.pointerType==='mouse'){lastInput='mouse';touchMode=false;}});
@@ -862,7 +868,7 @@ function mem(path,wx,wy,ang,a,wMul,colFn){
 function circ(x,y,r){ctx.beginPath();ctx.arc(x,y,Math.max(r,0.01),0,TAU);}
 function ell(x,y,rx,ry,rot){ctx.beginPath();ctx.ellipse(x,y,Math.max(rx,0.01),Math.max(ry,0.01),rot||0,0,TAU);}
 function blobPath(r,seed,t,amp,k){ctx.beginPath();const N=26;for(let i=0;i<=N;i++){const th=i/N*TAU;let rr=r;for(let j=1;j<=(k||3);j++)rr+=r*amp/j*Math.sin(th*(j+1)+seed*10*j+t*(0.6+j*0.3));const x=Math.cos(th)*rr,y=Math.sin(th)*rr;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();}
-function granules(n,r,seed,t,col,size){ctx.fillStyle=col;for(let i=0;i<n;i++){const a=hash(i,seed*1e4|0)*TAU+t*0.25*(i%2?1:-1),d=Math.sqrt(hash(i+7,seed*1e4|0))*r;ctx.fillRect(Math.cos(a)*d-size/2,Math.sin(a)*d-size/2,size,size);}}
+function granules(n,r,seed,t,col,size){const rel=ST.reliefGran;for(let i=0;i<n;i++){const a=hash(i,seed*1e4|0)*TAU+t*0.25*(i%2?1:-1),d=Math.sqrt(hash(i+7,seed*1e4|0))*r;const x=Math.cos(a)*d-size/2,y=Math.sin(a)*d-size/2;if(rel){ctx.fillStyle='rgba(250,250,245,0.55)';ctx.fillRect(x-size*0.35,y-size*0.35,size,size);ctx.fillStyle=col;ctx.fillRect(x+size*0.3,y+size*0.3,size,size);}else{ctx.fillStyle=col;ctx.fillRect(x,y,size,size);}}}
 function hairsAlong(pts,len,t,col,lw,phase){ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();for(let i=0;i<pts.length;i++){const[x,y,nx,ny]=pts[i];const w=Math.sin(t*8-i*0.6+(phase||0))*0.6;const ex=x+(nx+ny*w)*len,ey=y+(ny-nx*w)*len;ctx.moveTo(x,y);ctx.lineTo(ex,ey);}ctx.stroke();}
 function ellipsePts(a,b,n,indent){const pts=[];for(let i=0;i<n;i++){const th=i/n*TAU;let r=1;if(indent&&Math.sin(th)>0)r-=indent*Math.exp(-((th-1.9)**2)*3);const x=Math.cos(th)*a*r,y=Math.sin(th)*b*r;const nx=Math.cos(th)*b,ny=Math.sin(th)*a,l=Math.hypot(nx,ny);pts.push([x,y,nx/l,ny/l]);}return pts;}
 function polyPath(pts){ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();}
@@ -1309,7 +1315,7 @@ function updateCam(dt){
 
 /* ========== HUD ========== */
 const MODE_BTNS={};
-const MODE_DESC={bright:'Классика: свет сквозь прозрачные клетки',dark:'Чёрный фон, светятся контуры и реснички',phase:'Видно органеллы, светлые ореолы',fluo:'Ядра синие, хлорофилл красный'};
+const MODE_DESC={dic:'Серый фон, объёмный рельеф, окрашенные ядра и органеллы — как на научных снимках',bright:'Классика: свет сквозь прозрачные клетки',dark:'Чёрный фон, светятся контуры и реснички',phase:'Видно органеллы, светлые ореолы',fluo:'Ядра синие, хлорофилл красный'};
 MODE_KEYS.forEach((k,i)=>{const b=document.createElement('button');b.innerHTML='<b>'+(i+1)+' · '+MODES[k].ru+'</b><span>'+MODE_DESC[k]+'</span>';b.onclick=()=>setMode(k);$('modeBtns').appendChild(b);MODE_BTNS[k]=b;});
 function setMode(k){P.mode=k;if(P.modesSeen)P.modesSeen[k]=1;ST=MODES[k];if(!ST.cytoP)ST.cytoP=(h,a)=>ST.cyto(h,a);for(const kk of MODE_KEYS)MODE_BTNS[kk].classList.toggle('on',kk===k);if(editorOpen)drawEditor();}
 const FX_KEY='evo_stage1_fx';const FX={blur:true,ca:true,parts:true,vig:true,grain:true};
@@ -1321,7 +1327,7 @@ $('fxToggles').addEventListener('change',e=>{const k=e.target.dataset.fx;if(!k)r
 let setOpen=false,wasPaused=false;
 function toggleSettings(){if(editorOpen)return;setOpen=!setOpen;$('settings').classList.toggle('hidden',!setOpen);if(setOpen){wasPaused=paused;paused=true;$('pause').classList.add('hidden');}else paused=started?wasPaused:true;}
 $('bSet').onclick=toggleSettings;$('sClose').onclick=toggleSettings;
-for(const k of MODE_KEYS){const m=MODES[k];m.cytoP=k==='bright'?(h,a)=>`hsla(${h},16%,62%,${a*0.11})`:k==='phase'?(h,a)=>`hsla(${h},14%,32%,${a*0.33})`:k==='dark'?(h,a)=>`hsla(${h},45%,70%,${a*0.09})`:(h,a)=>`hsla(${h},100%,55%,${a*0.07})`;}
+for(const k of MODE_KEYS){const m=MODES[k];m.cytoP=k==='dic'?(h,a)=>`hsla(${h},30%,62%,${a*0.2})`:k==='bright'?(h,a)=>`hsla(${h},16%,62%,${a*0.11})`:k==='phase'?(h,a)=>`hsla(${h},14%,32%,${a*0.33})`:k==='dark'?(h,a)=>`hsla(${h},45%,70%,${a*0.09})`:(h,a)=>`hsla(${h},100%,55%,${a*0.07})`;}
 function niceLen(v){const c=[1,2,5,10,20,25,50,100,200,250,500,1000];let b=c[0];for(const x of c)if(x<=v)b=x;return b;}
 let hudT=0;
 function hud(){
@@ -1546,7 +1552,7 @@ $('bResume').onclick=()=>setPause(false);
 $('bPara').onclick=tryInfest;$('tPara').onclick=tryInfest;$('bEdit').onclick=toggleEditor;$('tEdit').onclick=toggleEditor;$('bDash').onclick=doDash;$('tDash').onclick=doDash;$('bZap').onclick=doZap;$('tZap').onclick=doZap;
 function begin(fresh){
  let isNew=false;if(fresh||!load()){P=newPlayer();cam.obj=0;isNew=true;}
- started=true;derive();if(isNew)P.hp=D.hpMax;setMode(P.mode||'bright');makeSpores();initWorld();cycE=null;cycT=rnd(330,420);P.inv=Math.max(P.inv,4);
+ started=true;derive();if(isNew)P.hp=D.hpMax;setMode(P.mode&&MODES[P.mode]?P.mode:'dic');makeSpores();initWorld();cycE=null;cycT=rnd(330,420);P.inv=Math.max(P.inv,4);
  ents=ents.filter(e=>{const s=SP[e.sp];if(!s||s.kind==='food')return true;return Math.hypot(e.x-P.x,e.y-P.y)>viewD()*1.3||(!s.dmg&&s.beh!=='amoeba');});cam.x=P.x;cam.y=P.y;cam.s=Math.min(W,H)/OBJ[cam.obj].d;
  $('start').classList.add('hidden');paused=false;
  if(fresh)toast('Ты — одна клетка в капле прудовой воды. <b>Ешь, делись, эволюционируй.</b>');

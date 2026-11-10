@@ -2,7 +2,7 @@
 function mkBody(sym,rs,hue,skel,fn){const b={sym,hue,skel:skel||'none',segs:rs.map(r=>({r,parts:[]}))};if(fn)fn(b.segs);return b;}
 function addP(s,t,sz){s.parts.push({t,s:sz||1});}
 function scaleBody(b,k){for(const s of b.segs)s.r*=k;}
-const SPEC={
+const SPEC=Object.assign({
  ostracod:{ru:'Остракода',lat:'Ostracoda',beh:'school',zones:{shelf:5,slope:3,deep:2},rel:[0.15,0.45],sc:[0.5,2.2],custom:'ostracod',hueVar:20,valK:1.3,
   info:'Крошечный рачок в двустворчатой раковинке. Плавает стайками — лёгкая добыча.',body:()=>mkBody('bilateral',[0.75,0.6],40,'exo')},
  trilobite:{ru:'Трилобит',lat:'Trilobita',beh:'graze',zones:{shelf:4,slope:5,deep:1.5},rel:[0.3,1.6],sc:[0.4,4],curl:1,hueVar:15,fight:0.3,
@@ -35,9 +35,24 @@ const SPEC={
  priapulid:{ru:'Приапулида',lat:'Priapulida',beh:'ambush',zones:{shelf:1,slope:2,deep:2},rel:[0.8,1.6],sc:[0.5,3.5],custom:'priap',fight:1,
   info:'Червь-засадчик: прячется в иле, выставив венчик шипов, и молниеносно хватает того, кто проплывает рядом.',
   body:()=>mkBody('bilateral',[1.2,1.1,1,0.95,0.85],25,'none',s=>{addP(s[0],'jaws',1.2);addP(s[0],'spine',1);})}
-};
+},{
+ wiwaxia:{ru:'Виваксия',lat:'Wiwaxia',beh:'graze',zones:{reef:4},sample:'reef',rel:[0.3,1.0],sc:[0.5,2.5],custom:'wiwaxia',hueVar:15,
+  info:'Пасущийся «слизень» в кольчуге из чешуек и с двумя рядами длинных шипов. Живёт только на рифах.',body:()=>mkBody('bilateral',[1.1,1.3,1.35,1.3,1.1],28,'none',s=>{for(let i=1;i<4;i++)addP(s[i],'spine',1.4);})},
+ marrella:{ru:'Маррелла',lat:'Marrella',beh:'school',zones:{currents:5,slope:0.3},sample:'currents',rel:[0.2,0.6],sc:[0.4,2],hueVar:20,
+  info:'«Кружевной краб»: крошечное членистоногое с длинными загнутыми назад шипами на голове. Держится в течениях у подводной горы.',body:()=>mkBody('bilateral',[0.9,0.6,0.55,0.5,0.45,0.4],190,'exo',s=>{addP(s[0],'antenna',1.4);addP(s[0],'spine',2);for(let i=1;i<6;i++)addP(s[i],'jleg',0.6);})},
+ vetulicola:{ru:'Ветуликолия',lat:'Vetulicola',beh:'school',zones:{currents:3,deep:0.3},sample:'currents',rel:[0.4,1.3],sc:[0.5,3],hueVar:12,
+  info:'Загадочное животное из двух половин: раздутая передняя часть с жаберными щелями и мускулистый хвост из сегментов.',body:()=>mkBody('bilateral',[1.7,1.85,1.7,0.8,0.75,0.65,0.55,0.45],40,'none',s=>{addP(s[1],'gill',0.8);addP(s[7],'tailfin',1.1);})},
+ slug:{ru:'Зелёный слизень',lat:'Viridolimax (вымышл.)',beh:'graze',zones:{lagoon:5},sample:'lagoon',fic:1,rel:[0.3,1],sc:[0.4,2.5],hueVar:15,
+  info:'Вымышленный пастух лагуны: в его коже живут водоросли, поэтому он зелёный. Медленный и беззащитный.',body:()=>mkBody('bilateral',[1.2,1.35,1.3,1.1,0.8],110,'none',s=>{addP(s[0],'eyes',0.7);addP(s[0],'antenna',0.6);})},
+ sulfur:{ru:'Серный ползун',lat:'Sulfurirepens (вымышл.)',beh:'graze',zones:{seeps:5},sample:'seeps',fic:1,glow:1,rel:[0.3,1.2],sc:[0.5,3],hueVar:10,
+  info:'Вымышленный бледный червь холодных сипов: ест бактериальные маты и слабо светится.',body:()=>mkBody('bilateral',[0.9,0.95,0.95,0.9,0.85,0.8,0.7,0.6,0.5],45,'none',s=>{for(let i=1;i<8;i++)addP(s[i],'leg',0.6);})},
+ haikou:{ru:'Хайкоуихтис',lat:'Haikouichthys',beh:'school',zones:{slope:1.5,deep:1.5,reef:0.5},rel:[0.4,1.2],sc:[0.5,3],hueVar:15,
+  info:'Одна из первых «рыб»: хорда, зачатки позвонков, спинной плавник и глаза. Родственник предков позвоночных.',body:()=>mkBody('bilateral',[0.9,1,1,0.95,0.85,0.75,0.6,0.5,0.4],210,'notochord',s=>{addP(s[0],'cameye',0.8);addP(s[2],'fin',0.6);addP(s[8],'tailfin',1);})}
+});
+const ZW={ostracod:{lagoon:4,shelf:5,reef:3,slope:3,deep:2,currents:3,seeps:1},trilobite:{lagoon:2,shelf:4,reef:4,slope:4,deep:1.5,currents:1,seeps:1},hallucigenia:{lagoon:1,shelf:2,reef:3,slope:2,deep:0.5,currents:1},polychaete:{lagoon:1,shelf:2,reef:2,slope:2,deep:3,seeps:2},pikaia:{lagoon:1,shelf:3,reef:2,slope:3,deep:1,currents:2},opabinia:{lagoon:0.2,shelf:2,reef:2,slope:2,deep:1.5,currents:1.5,seeps:1},anomalocaris:{shelf:1,reef:1.5,slope:1.5,deep:1.5,currents:2,seeps:1},reaper:{shelf:0.5,reef:0.5,slope:1,deep:1.8,seeps:2},jelly:{lagoon:1,shelf:2,reef:1.5,slope:2,deep:1.5,currents:3,seeps:0.5},ctenophore:{lagoon:0.5,shelf:1.5,reef:1,slope:1.5,deep:2,currents:2,seeps:1.5},glass:{slope:0.6,deep:2.2,seeps:2},priapulid:{lagoon:0.5,shelf:1,reef:1,slope:2,deep:2,seeps:2}};
+for(const k in ZW)SPEC[k].zones=ZW[k];
 for(const k in SPEC){const S=SPEC[k];S.id=k;S.baseL=bodyStats(S.body(),{}).L;}
-const ents=[],foods=[],nests=[],carr=[];
+const ents=[],foods=[],nests=[],carr=[];let spawnInView=false;
 let entId=1;
 function spawnEnt(sp,x,y,sc,o){
  o=o||{};const S=sp==='kin'||sp==='pack'?{id:sp,ru:sp==='kin'?'Сородич':'Потомок',beh:sp,zones:{},kin:1}:SPEC[sp];
@@ -56,7 +71,7 @@ function headR(e){return e.b.segs[0].r;}
 function addPlankton(x,y,z){foods.push({k:'pl',x,y,z,val:0.35,ph:R_()*TAU,hue:R_()<0.5?100:60});}
 function addCarrion(x,y,z,val,r,sp){carr.push({x,y,z,val,val0:val,r,t:0,sp,seed:R_()});}
 /* ===== поведение ===== */
-function canSee(e,tg,range){if(tg===P){if(!P.alive||P.bur)return false;const dark=clamp(1-P.z/SURF,0,1);range*=1-0.4*dark;}else if(tg.hid)return false;return Math.hypot(tg.x-e.x,tg.y-e.y)<range&&Math.abs(tg.z-e.z)<range*0.7;}
+function canSee(e,tg,range){if(tg===P){if(!P.alive||P.bur)return false;const dark=clamp(1-P.z/SURF,0,1);range*=1-0.4*dark;if(zoneAt(P.x)==='reef'&&P.z-floorH(P.x)<30)range*=0.5;}else if(tg.hid)return false;return Math.hypot(tg.x-e.x,tg.y-e.y)<range&&Math.abs(tg.z-e.z)<range*0.7;}
 function threatTo(e){
  let best=null,bd=1e9;const R=e.st.L*4+50;
  if(P.alive&&!P.bur&&P.st.Req>e.st.Req*1.15&&!e.S.kin){const d=d3(e,P);if(d<R&&d<bd){bd=d;best=P;}}
@@ -124,6 +139,7 @@ function entUpdate(e,dt){
   if(e.hp<e.st.hpMax)e.hp=Math.min(e.st.hpMax,e.hp+dt*0.5);
  }
  steer(e,dt,tx,ty,tz,spd);
+ const cu=curAt(e.x,e.z);if(cu&&!(crawler&&e.z-fz<st.Req*2))e.x+=cu*dt*(S.beh==='drift'?1:0.55);
  const f2=floorH(e.x,e.y)+st.Req*0.45;if(e.z<f2)e.z=f2;if(e.z>SURF-3)e.z=SURF-3;
  e.x=clamp(e.x,-HALF*0.95,HALF*0.95);e.y=clamp(e.y,-HALF*0.95,HALF*0.95);
  if(e.b.sym!=='radial'&&(e.b.skel==='none'||e.b.skel==='notochord')&&e.mv>0.05){const w=Math.sin(e.t*8)*headR(e)*0.25*e.mv;updateChain(e.b,e.pos,e.x-Math.sin(e.a)*w,e.y+Math.cos(e.a)*w,e.z);}else updateChain(e.b,e.pos,e.x,e.y,e.z);
@@ -137,23 +153,23 @@ function viewR(){return Math.hypot(W,H)/cam.s*0.55;}
 function pickSpecies(zone){let tot=0;for(const k in SPEC)tot+=SPEC[k].zones[zone]||0;let r=R_()*tot;for(const k in SPEC){r-=SPEC[k].zones[zone]||0;if(r<=0)return k;}return 'ostracod';}
 function sizeFor(S){const PL=P.st.L;return clamp(PL*rnd(S.rel[0],S.rel[1])/S.baseL,S.sc[0],S.sc[1]);}
 function popTick(dt){
- const vr=viewR(),ACT=Math.max(260,vr*1.5);
+ const vr=viewR(),ACT=Math.max(220,vr*1.35);
  for(let i=ents.length-1;i>=0;i--){const e=ents[i];if(e.gone){ents.splice(i,1);continue;}if(e.S.beh!=='pack'&&Math.hypot(e.x-P.x,e.y-P.y)>ACT*1.7){ents.splice(i,1);}}
- const want=48+Math.min(30,P.st.L*0.4);let n=ents.filter(e=>!e.S.kin).length;let guard=0;
- while(n<want&&guard++<6){
-  const a=R_()*TAU,d=rnd(vr*1.05,ACT);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;
-  const sp=pickSpecies(zoneAt(x,y));const S=SPEC[sp];
+ const want=80+Math.min(30,P.st.L*0.4);let n=ents.filter(e=>!e.S.kin).length;let guard=0;
+ while(n<want&&guard++<(spawnInView?40:6)){
+  const a=R_()*TAU,d=spawnInView?rnd(0,ACT):rnd(vr*1.02,ACT);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;
+  let sp=pickSpecies(zoneAt(x,y));if(SPEC[sp].beh==='hunt'){let tries=0;while(SPEC[sp].beh==='hunt'&&tries++<8)sp=pickSpecies(zoneAt(x,y));if(SPEC[sp].beh==='hunt')continue;}const S=SPEC[sp];
   if(S.beh==='school'){const sc=sizeFor(S),k=4+((R_()*6)|0);const lead=spawnEnt(sp,x,y,sc);lead.lead=lead;for(let q=1;q<k;q++){const e=spawnEnt(sp,x+rnd(-15,15),0,sc*rnd(0.85,1.1));e.lead=lead;e.ox=rnd(-1,1)*lead.st.L*2.5;e.oy=rnd(-1,1)*lead.st.L*2.5;e.oz=rnd(-1,1)*lead.st.L;e.z=lead.z+e.oz;e.pos=initChain(e.b,e.x,e.y,e.z,e.a);}n+=k;}
   else{spawnEnt(sp,x,y,sizeFor(S));n++;}
  }
  // хищники распределены равномерно: в любой зоне рядом держится примерно одинаковое их число
- const hunters=ents.filter(e=>e.S.beh==='hunt'&&!e.gone).length,wantH=4+Math.min(4,Math.floor(P.st.L/15));
+ const pz=zoneAt(P.x);const hunters=ents.filter(e=>e.S.beh==='hunt'&&!e.gone).length,wantH=pz==='lagoon'?1:4+Math.min(4,Math.floor(P.st.L/15))+(pz==='deep'||pz==='seeps'?1:0);
  if(hunters<wantH&&R_()<dt*1.2){const sd=R_()<0.5?-1:1,d=rnd(vr*1.05,ACT);const x=clamp(P.x+sd*d,-HALF*0.9,HALF*0.9);const zn=zoneAt(x);const hs=Object.keys(SPEC).filter(k=>SPEC[k].beh==='hunt');let tot=0;for(const k of hs)tot+=SPEC[k].zones[zn]||0;let r=R_()*tot,sp=hs[0];for(const k of hs){r-=SPEC[k].zones[zn]||0;if(r<=0){sp=k;break;}}spawnEnt(sp,x,0,sizeFor(SPEC[sp]));}
  // сородичи
- const kin=ents.filter(e=>e.sp==='kin');if(kin.length<2&&R_()<dt*0.4){const a=R_()*TAU,d=rnd(vr*1.05,vr*1.6);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;const b=cloneBody(P.body);scaleBody(b,rnd(0.85,1.05));const e=spawnEnt('kin',x,y,1,{body:b,un:P.un});e.mate=true;}
+ const kin=ents.filter(e=>e.sp==='kin');if(kin.length<3&&R_()<dt*0.5){const a=R_()*TAU,d=rnd(vr*1.05,vr*1.6);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;if(ZONES[zoneAt(x)].nest){const b=cloneBody(P.body);scaleBody(b,rnd(0.85,1.05));const e=spawnEnt('kin',x,y,1,{body:b,un:P.un});e.mate=true;}}
  // планктон
- for(let i=foods.length-1;i>=0;i--){const f=foods[i];if(f.dead||Math.hypot(f.x-P.x,f.y-P.y)>ACT*1.5)foods.splice(i,1);}
- const wf=90;let g2=0;while(foods.length<wf&&g2++<12){const a=R_()*TAU,d=rnd(foods.length<wf*0.5?20:vr*0.9,ACT);const x=P.x+Math.cos(a)*d,y=0;const fz=floorH(x);const zz=clamp(P.z+rnd(-90,90)*Math.max(1,vr/120),fz+3,SURF-4);if(R_()<0.25+0.75*(zz/SURF))addPlankton(x,y,zz);}
+ for(let i=foods.length-1;i>=0;i--){const f=foods[i];const cu=curAt(f.x,f.z);if(cu)f.x+=cu*dt;if(f.dead||Math.hypot(f.x-P.x,f.y-P.y)>ACT*1.5)foods.splice(i,1);}
+ const wf=pz==='currents'?260:pz==='lagoon'?140:110;let g2=0;while(foods.length<wf&&g2++<16){const a=R_()*TAU,d=rnd(foods.length<wf*0.5?20:vr*0.9,ACT);const x=P.x+Math.cos(a)*d,y=0;const fz=floorH(x);const zz=clamp(P.z+rnd(-90,90)*Math.max(1,vr/120),fz+3,SURF-4);if(R_()<0.25+0.75*(zz/SURF))addPlankton(x,y,zz);}
  for(let i=carr.length-1;i>=0;i--){const c=carr[i];c.t+=dt;const fz=floorH(c.x,c.y)+c.r*0.4;if(c.z>fz)c.z=Math.max(fz,c.z-dt*12);if(c.val<=0.3||c.t>120||Math.hypot(c.x-P.x,c.y-P.y)>ACT*2)carr.splice(i,1);}
 }
 /* ===== отрисовка особых существ ===== */
@@ -165,8 +181,14 @@ function drawEnt(e){
  else if(S.custom==='glass'){const p=proj(e.x,e.y,e.z),r=st.Req*s;const dk=clamp(1-e.z/SURF,0,1);ctx.strokeStyle=`rgba(210,240,255,${0.65-0.3*dk})`;ctx.lineWidth=Math.max(0.6,r*0.05);ctx.beginPath();for(let k=0;k<16;k++){const a=k/16*TAU+e.t*0.3,l=r*(1.1+0.6*hash(k,e.id));ctx.moveTo(p[0]+Math.cos(a)*r*0.4,p[1]+Math.sin(a)*r*0.3);ctx.lineTo(p[0]+Math.cos(a)*l,p[1]+Math.sin(a)*l*0.75);}ctx.stroke();ctx.fillStyle=`rgba(190,230,255,${0.16})`;ctx.beginPath();ctx.arc(p[0],p[1],r*0.5,0,TAU);ctx.fill();ctx.fillStyle=`rgba(120,255,220,${0.5+0.4*Math.sin(e.t*3)})`;ctx.beginPath();ctx.arc(p[0],p[1],Math.max(1,r*0.12),0,TAU);ctx.fill();}
  else if(S.custom==='priap'){const p=proj(e.x,e.y,fz),r=st.Req*s;if(e.hid){ctx.fillStyle='rgba(60,50,35,0.45)';ctx.beginPath();ctx.ellipse(p[0],p[1],r*1.2,r*0.55,0,0,TAU);ctx.fill();ctx.fillStyle='rgba(230,200,150,0.7)';for(let k=0;k<10;k++){const a=k/10*TAU;ctx.beginPath();ctx.arc(p[0]+Math.cos(a)*r*0.55,p[1]+Math.sin(a)*r*0.25,Math.max(0.6,r*0.07),0,TAU);ctx.fill();}}
   else{const hgt=st.L*0.9*s*Math.min(1,(1.2-e.stt)*5);ctx.strokeStyle=`hsla(25,45%,52%,0.95)`;ctx.lineCap='round';ctx.lineWidth=r*1.3;ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0]+Math.sin(e.t*9)*r*0.3,p[1]-hgt);ctx.stroke();ctx.strokeStyle='rgba(90,50,30,0.5)';ctx.lineWidth=Math.max(0.6,r*0.08);for(let q=1;q<6;q++){const yy=p[1]-hgt*q/6;ctx.beginPath();ctx.moveTo(p[0]-r*0.6,yy);ctx.lineTo(p[0]+r*0.6,yy);ctx.stroke();}ctx.fillStyle='rgba(240,220,170,0.9)';for(let k=0;k<12;k++){const a=k/12*TAU;ctx.beginPath();ctx.arc(p[0]+Math.cos(a)*r*0.75,p[1]-hgt+Math.sin(a)*r*0.3,Math.max(0.6,r*0.09),0,TAU);ctx.fill();}}}
+ else if(S.custom==='wiwaxia'){const p=proj(e.x,e.y,e.z),r=st.Req*s*1.25;const fl=Math.cos(e.a)<0?-1:1;ctx.save();ctx.translate(p[0],p[1]+r*0.3);ctx.scale(fl,1);const L=lightAt(e.z);
+   ctx.strokeStyle=`hsla(${e.b.hue},35%,${70*L|0}%,0.95)`;ctx.lineWidth=Math.max(1,r*0.09);for(let k=0;k<7;k++){const u=k/6-0.5;const sw=Math.sin(e.t*1.5+k)*0.05;ctx.beginPath();ctx.moveTo(u*r*1.4,-r*0.55);ctx.lineTo(u*r*1.6-r*0.35+sw*r,-r*(1.45+0.25*Math.cos(u*3)));ctx.stroke();}
+   const g=ctx.createLinearGradient(0,-r*0.7,0,r*0.1);g.addColorStop(0,`hsla(${e.b.hue},45%,${62*L|0}%,1)`);g.addColorStop(1,`hsla(${e.b.hue},40%,${28*L|0}%,1)`);ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,r*1.15,r*0.62,0,Math.PI,TAU);ctx.closePath();ctx.fill();
+   ctx.strokeStyle=`hsla(${e.b.hue},40%,${80*L|0}%,0.35)`;ctx.lineWidth=Math.max(0.5,r*0.04);for(let q=0;q<5;q++){ctx.beginPath();ctx.ellipse(0,0,r*(0.3+q*0.18),r*(0.16+q*0.1),0,Math.PI*1.05,Math.PI*1.95);ctx.stroke();}
+   ctx.fillStyle=`hsla(${e.b.hue},30%,${25*L|0}%,0.9)`;ctx.fillRect(-r*1.05,-r*0.05,r*2.1,r*0.12);ctx.restore();}
  else if(e.curl>0&&S.curl){const p=proj(e.x,e.y,e.z),r=st.Req*s*1.25;ctx.fillStyle=`hsla(${e.b.hue},40%,48%,0.95)`;ctx.beginPath();ctx.ellipse(p[0],p[1],r,r*0.8,0,0,TAU);ctx.fill();ctx.strokeStyle=`hsla(${e.b.hue},40%,25%,0.9)`;ctx.lineWidth=Math.max(0.8,r*0.07);ctx.stroke();for(let q=1;q<5;q++){ctx.beginPath();ctx.arc(p[0],p[1]+r*0.9,r*(0.4+q*0.2),Math.PI*1.2,Math.PI*1.8);ctx.stroke();}}
  else drawBody(e.b,e.pos,{moving:e.mv,heading:e.a,brain:e.S.kin?P.st.brain:0});
+ if(S.glow){ctx.save();ctx.globalCompositeOperation='lighter';for(let i=0;i<e.pos.length;i++){const q=proj(e.pos[i].x,0,e.pos[i].z);const a=0.25+0.2*Math.sin(e.t*3+i);ctx.fillStyle=`rgba(140,255,210,${a})`;ctx.beginPath();ctx.arc(q[0],q[1],Math.max(1.5,e.b.segs[i].r*s*0.35),0,TAU);ctx.fill();}ctx.restore();}
  if(e.S.kin){const p=proj(e.pos[0].x,e.pos[0].y,e.pos[0].z);const r=st.Req*s;if(e.sp==='kin'&&e.mate){ctx.fillStyle=`rgba(255,120,170,${0.6+0.3*Math.sin(T_*4)})`;heart(p[0],p[1]-r*2.6-6,Math.max(5,r*0.6));}else if(e.sp==='pack'){ctx.strokeStyle='rgba(120,220,255,0.7)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p[0],p[1]-r*2.2-5,3,0,TAU);ctx.stroke();}}
  if(e.dmgT>0&&e.hp>0){const p=proj(e.x,e.y,e.z),r=Math.max(8,st.Req*s*1.6),k=clamp(e.hp/e.st.hpMax,0,1);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.beginPath();ctx.arc(p[0],p[1]-r*0.3,r,Math.PI*0.2,Math.PI*0.8);ctx.stroke();ctx.strokeStyle=`hsla(${k*110},80%,58%,0.9)`;ctx.beginPath();ctx.arc(p[0],p[1]-r*0.3,r,Math.PI*0.8-Math.PI*0.6*k,Math.PI*0.8);ctx.stroke();}
 }

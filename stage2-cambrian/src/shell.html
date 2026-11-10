@@ -69,6 +69,7 @@ body.touch #toasts{top:auto;bottom:calc(150px + env(safe-area-inset-bottom));wid
 .meter i{display:block;height:100%;background:#7fc0ff}
 input[type=range]{width:100%}
 @media (max-width:760px){#hud{width:200px;font-size:12px}#goal{display:none}.ecols{grid-template-columns:1fr}.cards{grid-template-columns:1fr}}
+.zb{font-size:10.5px;font-weight:400;color:#9fc4dc;margin-left:4px}
 </style>
 </head>
 <body>
@@ -81,14 +82,14 @@ input[type=range]{width:100%}
  <div class="lbl"><span>Питательные вещества</span><span id="bmTxt" style="color:#e0b84a"></span></div>
  <div class="lbl"><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span><span id="lenTxt"></span></div>
  <div class="lbl"><span id="offTxt"></span><span id="packTxt"></span></div>
- <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bEgg" class="hidden">Отложить яйца (R)</button><button id="bBur" class="hidden">Закопаться (B)</button><button id="bPack" class="hidden">Стая</button><button id="bFinal" class="hidden on">Завершить этап</button></div>
+ <div id="hudBtns"><button id="bDash" class="hidden">Рывок (Q)</button><button id="bEdit">Эволюция (E)</button><button id="bEgg" class="hidden">Отложить яйца (R)</button><button id="bBur" class="hidden">Закопаться (B)</button><button id="bPack" class="hidden">Стая</button><button id="bFinal" class="hidden on">Завершить этап</button></div>
 </div>
 <div id="goal" class="panel"></div>
 <div id="info"></div>
 <div id="toasts"></div>
 <div id="hint" class="panel"></div>
 <div id="joy"><div id="knob"></div></div>
-<div id="mob"><button id="mFinal" class="hidden on">Финал</button><button id="mPack" class="hidden">Стая</button><button id="mBur" class="hidden">Нора</button><button id="mEgg" class="hidden">Яйца</button><button id="mEdit" class="big">Эволюция</button><button id="mPause">❚❚</button></div>
+<div id="mob"><button id="mFinal" class="hidden on">Финал</button><button id="mPack" class="hidden">Стая</button><button id="mBur" class="hidden">Нора</button><button id="mEgg" class="hidden">Яйца</button><button id="mDash" class="hidden">Рывок</button><button id="mEdit" class="big">Эволюция</button><button id="mPause">❚❚</button></div>
 
 <div id="start" class="modal"><div class="box" style="max-width:640px">
  <h1>Эволюция · Уровень 2</h1>

@@ -1,19 +1,19 @@
 /* ===== игрок ===== */
 const SAVE='evo_stage2_v1',META_KEY='evo_stage2_meta';
-function newPlayer(sym,seed){return{sym,seed,body:defaultBody(sym),un:{},st:null,x:0,y:0,z:300,a:0,vx:0,vy:0,vz:0,mv:0,pos:[],hp:1,o2:1,sat:0.85,bm:8,dna:5,dnaF:0,gen:1,off:0,eaten:{},time:0,bur:false,packOn:false,eggCd:0,bcd:0,inv:0,alive:false,zones:{},flags:{},kills:0,eggsLaid:0,hatched:0,lastNest:null,home:null,hit:0,foodCount:0,packN:0,done:false,gut:[]};}
+function newPlayer(sym,seed){return{sym,seed,body:defaultBody(sym),un:{},st:null,x:0,y:0,z:300,a:0,vx:0,vy:0,vz:0,mv:0,pos:[],hp:1,o2:1,sat:0.85,bm:8,dna:5,dnaF:0,gen:1,off:0,eaten:{},time:0,bur:false,packOn:false,eggCd:0,bcd:0,inv:0,alive:false,zones:{},flags:{},kills:0,eggsLaid:0,hatched:0,lastNest:null,home:null,hit:0,foodCount:0,packN:0,done:false,gut:[],samples:{},dashT:0,dashCd:0};}
 let P=newPlayer('bilateral',1);P.st=bodyStats(P.body,P.un);
 const GOAL=()=>P.sym==='radial'?24:60;
 function lenMM(){return P.sym==='radial'?P.body.segs[0].r*2:P.st.L;}
 function camScale(){return Math.min(W,H)/(Math.max(P.st.L*(P.sym==='radial'?2.2:1),10)*(touchUI&&Math.min(W,H)<500?6.5:8.5));}
 function refreshStats(){const r=P.st&&P.st.hpMax?P.hp/P.st.hpMax:1;P.st=bodyStats(P.body,P.un);P.hp=clamp(r,0.05,1)*P.st.hpMax;cam.ts=camScale();}
-function findSpawn(){for(let k=0;k<400;k++){const x=rnd(-10500,-7500);if(floorH(x)>SURF*0.85&&floorType(x)!=='rock')return[x,0];}return[-9000,0];}
+function findSpawn(){for(let k=0;k<400;k++){const x=rnd(-11000,-9800);if(floorH(x)>SURF*0.88&&floorType(x)!=='rock')return[x,0];}return[-10400,0];}
 function placePlayer(x,y){P.x=x;P.y=y;P.z=floorH(x,y)+P.st.Req*0.7;P.y=0;P.vx=P.vy=P.vz=0;P.pos=initChain(P.body,P.x,0,P.z,P.a);cam.s=cam.ts;cam.x=P.x;cam.z=P.z;camUpdate(P.x,0,P.z,1);}
 /* ===== ввод ===== */
 const keys={},mouse={x:0,y:0,on:false};
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]=true;if(e.code==='Space')e.preventDefault();
  if(e.repeat)return;
  if(e.code==='KeyE'){edOpen?closeEditor():openEditor();}
- else if(e.code==='KeyR')layEggs();else if(e.code==='KeyB')toggleBurrow();
+ else if(e.code==='KeyR')layEggs();else if(e.code==='KeyQ')dash();else if(e.code==='KeyB')toggleBurrow();
  else if(e.code==='KeyP'||e.code==='Escape'){if(edOpen)closeEditor();else if(!$('start').classList.contains('hidden'))return;else setPause(!paused);}});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
@@ -29,14 +29,16 @@ cv.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identif
    joy.ox+=(dx/l)*(l-1)*JR;joy.oy+=(dy/l)*(l-1)*JR;dx/=l;dy/=l;}joy.x=Math.abs(dx)<0.12&&Math.abs(dy)<0.12?0:dx;joy.y=Math.abs(dx)<0.12&&Math.abs(dy)<0.12?0:dy;joyShow();}e.preventDefault();},{passive:false});
 const joyEnd=e=>{for(const t of e.changedTouches)if(t.identifier===joy.id){joy.id=null;joy.on=false;joy.x=joy.y=0;joyShow();}};
 cv.addEventListener('touchend',joyEnd);cv.addEventListener('touchcancel',joyEnd);
-for(const[id,fn]of[['mEdit',()=>openEditor()],['mEgg',()=>layEggs()],['mBur',()=>toggleBurrow()],['mPack',()=>togglePack()],['mFinal',()=>openFinal()],['mPause',()=>setPause(true)]])$(id).addEventListener('click',fn);
-$('bEdit').onclick=()=>openEditor();$('bEgg').onclick=()=>layEggs();$('bBur').onclick=()=>toggleBurrow();$('bPack').onclick=()=>togglePack();$('bFinal').onclick=()=>openFinal();$('bResume').onclick=()=>setPause(false);
+for(const[id,fn]of[['mEdit',()=>openEditor()],['mEgg',()=>layEggs()],['mBur',()=>toggleBurrow()],['mPack',()=>togglePack()],['mFinal',()=>openFinal()],['mPause',()=>setPause(true)],['mDash',()=>dash()]])$(id).addEventListener('click',fn);
+$('bDash').onclick=()=>dash();$('bEdit').onclick=()=>openEditor();$('bEgg').onclick=()=>layEggs();$('bBur').onclick=()=>toggleBurrow();$('bPack').onclick=()=>togglePack();$('bFinal').onclick=()=>openFinal();$('bResume').onclick=()=>setPause(false);
 /* ===== сообщения ===== */
 function toast(h){const d=document.createElement('div');d.className='toast panel';d.innerHTML=h;$('toasts').appendChild(d);setTimeout(()=>d.remove(),6500);while($('toasts').children.length>4)$('toasts').firstChild.remove();}
 let paused=true,edOpen=false;
 function setPause(v){paused=v;$('pause').classList.toggle('hidden',!v||!P.alive||!$('start').classList.contains('hidden'));}
 /* ===== еда и урон ===== */
-function gainFood(v,sp,silent){P.bm+=v;P.sat=Math.min(1,P.sat+v/(P.st.M*1.4+6));P.dnaF+=v*0.14;P.foodCount++;while(P.dnaF>=1){P.dnaF-=1;P.dna++;}
+const SAMPLE_Z=['lagoon','reef','currents','seeps'];
+function giveSample(z){if(P.samples[z])return;P.samples[z]=1;P.dna+=4;const nodes=NODES.filter(n=>n.zone===z).map(n=>n.ru);toast(`<b>Образец зоны «${ZONES[z].ru}»</b> (+4 ДНК). В древе открылись: ${nodes.join(', ')}.`);save();}
+function gainFood(v,sp,silent){if(sp&&SPEC[sp]&&P.un.stomach)v*=1.4;if(sp&&SPEC[sp]&&SPEC[sp].sample)giveSample(SPEC[sp].sample);P.bm+=v;P.sat=Math.min(1,P.sat+v/(P.st.M*1.4+6));P.dnaF+=v*0.14;P.foodCount++;while(P.dnaF>=1){P.dnaF-=1;P.dna++;}
  if(sp&&SPEC[sp]&&!P.eaten[sp]){P.eaten[sp]=1;P.dna+=3;toast(`Новая добыча: <b>${SPEC[sp].ru}</b> <span class="muted small">(${SPEC[sp].lat})</span> · +3 ДНК<br><span class="small muted">${SPEC[sp].info}</span>`);}}
 function hurtPlayer(d,src,sting){if(!P.alive||P.inv>0||P.bur)return;d*=P.st.armor;if(sting&&P.body.skel!=='none')d*=0.6;P.hp-=d;P.hit=0.35;P.lastHit=src&&src.S?src.S.ru:'';
  if(src&&src.hp!=null&&P.st.spine>0&&!sting){src.hp-=P.st.spine;src.dmgT=2;}
@@ -80,6 +82,7 @@ function respawn(hasOff){
  $('hTitle').textContent=`Поколение ${P.gen}`;save();}
 /* ===== размножение, нора, стая ===== */
 function layEggs(){if(!P.alive||P.bur||edOpen)return;
+ if(!ZONES[zoneAt(P.x)].nest){toast('Нереститься можно только в <b>Тёплой лагуне</b> или на <b>Рифах археоциат</b> — в других местах икру сразу съедят. Сородичи с ♥ живут там же.');return;}
  if(P.eggCd>0){toast(`Организм ещё не готов к новой кладке: ${Math.ceil(P.eggCd)} с`);return;}
  const mate=ents.find(e=>e.sp==='kin'&&e.mate&&d3(e,P)<P.st.L*2.5+10);
  if(!mate){toast('Рядом нет партнёра. Ищи сородичей с <b style="color:#ff8fb8">♥</b> — розовые стрелки указывают на них.');return;}
@@ -97,13 +100,13 @@ function nestTick(dt){for(let i=nests.length-1;i>=0;i--){const n=nests[i];if(n.e
   if(n.eggs<=0)nests.splice(i,1);}}
 function toggleBurrow(){if(!P.alive||edOpen)return;if(P.bur){P.bur=false;return;}
  if(!P.un.burrow){toast('Чтобы закапываться, открой «Рытьё» в древе эволюции');return;}
- const ft=floorType(P.x,P.y);if(ft!=='sand'&&ft!=='mud'){toast('Закопаться можно только в песок или ил');return;}
+ const ft=floorType(P.x);if(ft==='rock'||(!P.un.fastburrow&&ft!=='sand'&&ft!=='mud')){toast(P.un.fastburrow?'В скалу не закопаться':'Закопаться можно только в песок или ил');return;}
  if(P.z-floorH(P.x,P.y)>P.st.Req*2.5){toast('Опустись ко дну, чтобы закопаться');return;}
  if(P.body.skel==='shell'||P.sym==='radial'){toast('С таким телом закопаться не выйдет');return;}
  P.bur=true;P.vx=P.vy=P.vz=0;for(const e of ents)if(e.tgt===P){e.tgt=null;e.full=2;}toast('Ты зарылся в грунт: хищники тебя не видят');}
 /* ===== обновление игрока ===== */
 function playerUpdate(dt){
- const st=P.st;P.time+=dt;P.eggCd-=dt;P.bcd-=dt;P.inv-=dt;P.hit-=dt;
+ const st=P.st;P.time+=dt;P.eggCd-=dt;P.dashT-=dt;P.dashCd-=dt;P.bcd-=dt;P.inv-=dt;P.hit-=dt;
  const fz=floorH(P.x,P.y),minZ=fz+st.Req*0.55;
  let dx=0,dz=0;const kW=keys.KeyW||keys.ArrowUp||keys.Space,kS=keys.KeyS||keys.ArrowDown||keys.ShiftLeft||keys.ShiftRight,kA=keys.KeyA||keys.ArrowLeft,kD=keys.KeyD||keys.ArrowRight;
  if(kW)dz+=1;if(kS)dz-=1;if(kD)dx+=1;if(kA)dx-=1;
@@ -111,14 +114,17 @@ function playerUpdate(dt){
  else if(joy.on){dx=joy.x;dz=-joy.y;}
  else if(mouse.on&&!edOpen&&!touchUI){const[wx,wz]=screenToWorld(mouse.x,mouse.y);const ex=wx-P.x,ez=wz-P.z;const d=Math.hypot(ex,ez),dead=Math.max(1.5,st.L*0.45);if(d>dead){const k=Math.min(1,(d-dead)/(st.L*2.5+4));dx=ex/d*k;dz=ez/d*k;}}
  if(P.air){airTick(dt,dx);updateChain(P.body,P.pos,P.x,0,P.z);P.time+=0;return;}
+ if(P.bur&&P.un.fastburrow&&dz<0.5&&Math.abs(dx)>0.2){P.x=clamp(P.x+dx*st.speed*0.3*dt,-HALF*0.95,HALF*0.95);if(floorType(P.x)==='rock')P.bur=false;dx=0;dz=0;}
  if(P.bur){if(Math.hypot(dx,dz)>0.3)P.bur=false;else{P.z+=(fz-st.Req*0.1-P.z)*Math.min(1,dt*3);P.mv=0;}}
  if(!P.bur){
   const near=P.z-minZ<st.Req*1.6;let spd=near&&st.crawl>st.speed?st.crawl:st.speed;
+  if(near&&P.un.sucker&&floorType(P.x)==='rock')spd=Math.max(spd,st.crawl*2);if(P.dashT>0)spd*=2.6;
   if(P.o2<0.15)spd*=0.6;if(P.sat<0.08)spd*=0.8;
   if(P.sym==='radial')spd*=0.45+0.75*Math.max(0,Math.sin(P.time*5));
   const k=Math.min(1,dt*(P.sym==='radial'?2.5:4.5));
   const sink=(P.body.skel==='exo'||P.body.skel==='shell')?-5:-0.6;
   P.vx+=(dx*spd-P.vx)*k;P.vz+=((Math.abs(dz)>0.05?dz*spd:sink)-P.vz)*k;
+  const cu=curAt(P.x,P.z);if(cu&&!(P.un.sucker&&near))P.x+=cu*dt*(P.un.streamline?0.5:1);
   P.x=clamp(P.x+P.vx*dt,-HALF*0.95,HALF*0.95);P.y=0;P.z+=P.vz*dt;
   const mz=floorH(P.x)+st.Req*0.55;if(P.z<mz){P.z=mz;if(P.vz<0)P.vz=0;}
   surfaceTick(dt,spd);
@@ -128,7 +134,9 @@ function playerUpdate(dt){
  if(P.body.sym!=='radial'&&(P.body.skel==='none'||P.body.skel==='notochord')&&P.mv>0.05){const w=Math.sin(P.time*8)*P.body.segs[0].r*0.25*P.mv;updateChain(P.body,P.pos,P.x-Math.sin(P.a)*w,0,P.z+Math.cos(P.a)*w);}else updateChain(P.body,P.pos,P.x,P.y,P.z);
  // кислород
  const skin=0.75/(1+st.M/60),absorb=o2At(P.z)*(skin+Math.min(1.5,st.gill*0.17));
- const need=(P.bur?0.15:0.28+0.22*P.mv)+0.05*Math.log2(1+st.M/10);
+ const zP=zoneAt(P.x),chemoOn=P.un.chemo&&(zP==='deep'||zP==='seeps');
+ const need=(P.bur?0.15:0.28+0.22*P.mv)+0.05*Math.log2(1+st.M/10)-(chemoOn?0.1:0);
+ if(chemoOn){P.sat=Math.min(1,P.sat+dt*0.006);P.bm+=dt*0.03;}if(P.un.symb&&lightAt(P.z)>0.8){P.sat=Math.min(1,P.sat+dt*0.006);P.bm+=dt*0.03;}
  P.o2=clamp(P.o2+(absorb-need)*0.12*dt+(P.z>SURF-st.Req*1.5?dt*0.25:0),0,1);if(P.o2<=0){P.hp-=dt*st.hpMax*0.05;P.lastHit='';}
  if(P.o2<0.3&&!P.flags.o2warn){P.flags.o2warn=1;toast(P.st.gill?'Кислород на исходе — поднимись выше, к свету.':'Кислород на исходе! Поднимись к поверхности. Чтобы жить глубже и расти крупнее, отрасти <b>жабры</b>.');}
  // сытость
@@ -137,15 +145,15 @@ function playerUpdate(dt){
  // еда
  if(!P.bur){const h=P.pos[0],hr=P.body.segs[0].r,fx=Math.cos(P.a),fz2=Math.sin(P.a);const rad=P.sym==='radial';
   const mx=h.x+(rad?0:fx*hr*0.8),my=0,mz=h.z+(rad?-hr*0.6:fz2*hr*0.8);
-  const pr=hr*1.2+1.5+(st.c.tentacle?st.Req*0.7:0)+(rad?st.Req*0.8:0);
-  for(const f of foods){if(f.dead)continue;if(Math.abs(f.x-mx)<pr&&Math.abs(f.y-my)<pr&&Math.abs(f.z-mz)<pr){f.dead=1;gainFood(f.val);}}
+  const pr=hr*1.2+1.5+(st.c.tentacle?st.Req*0.7:0)+(rad?st.Req*0.8:0)+(P.un.filter?st.Req*1.5+2:0);
+  for(const f of foods){if(f.dead)continue;if(Math.abs(f.x-mx)<pr&&Math.abs(f.y-my)<pr&&Math.abs(f.z-mz)<pr){f.dead=1;gainFood(f.val*(P.un.filter?2:1));}}
   if(P.bcd<=0){
    let best=null,bd=1e9;
    for(const e of ents){if(e.S.kin||e.gone||(e.hid&&e.S.beh==='ambush'))continue;const r=(rad?st.Req*1.5:hr*1.25+st.reach)+e.st.Req*0.9+1;const q=e.pos[0];const dd=Math.min(Math.hypot(e.x-mx,e.y-my,e.z-mz),Math.hypot(q.x-mx,q.y-my,q.z-mz));if(dd<r&&dd<bd){bd=dd;best=e;}}
    if(best)playerBite(best);
-   else for(const c of carr){if(Math.hypot(c.x-mx,c.y-my,c.z-mz)<hr*1.3+c.r+1.5){const ch=Math.min(c.val,2+st.bite*1.5+st.M*0.15);c.val-=ch;gainFood(ch,c.sp);P.bcd=0.45;break;}}
+   else for(const c of carr){if(Math.hypot(c.x-mx,c.y-my,c.z-mz)<hr*1.3+c.r+1.5){const ch=Math.min(c.val,2+st.bite*1.5+st.M*0.15);c.val-=ch;gainFood(ch*(P.un.scav?1.6:1));P.bcd=0.45;break;}}
   }
-  if(P.z-fz<st.Req*2){const k=gIdx(P.x,P.y);if(TY[k]===3&&MAT[k]>0.15){const e=Math.min(MAT[k]-0.1,dt*0.35);MAT[k]-=e;P.bm+=e*1.3;P.sat=Math.min(1,P.sat+e*2.5/(st.M*1.4+6));P.dnaF+=e*0.2;}}
+  if(P.z-fz<st.Req*2){const k=gIdx(P.x);if((TY[k]===3||TY[k]===4)&&MAT[k]>0.15){const rr=P.un.radula?2:1;const e=Math.min(MAT[k]-0.1,dt*0.35*rr);MAT[k]-=e;P.bm+=e*1.3;P.sat=Math.min(1,P.sat+e*2.5/(st.M*1.4+6));P.dnaF+=e*0.2;if(TY[k]===4)giveSample('seeps');else if(zP==='lagoon')giveSample('lagoon');}}
  }
  // зоны
  const zn=zoneAt(P.x,P.y);if(!P.zones[zn]){P.zones[zn]=1;if(Object.keys(P.zones).length>1){P.dna+=2;toast(`Новая зона: <b>${ZONES[zn].ru}</b> (+2 ДНК)<br><span class="small muted">${ZONES[zn].info}</span>`);}}
@@ -167,16 +175,17 @@ function drawFx(){const s=cam.s,sy=syW(SURF);
  for(const b of bubbles){const p=proj(b.x,0,b.z);ctx.strokeStyle='rgba(220,245,255,0.7)';ctx.lineWidth=Math.max(0.6,s*0.06);ctx.beginPath();ctx.arc(p[0],p[1],Math.max(1,b.r*s),0,TAU);ctx.stroke();}}
 function surfaceTick(dt,spd){const st=P.st,top=SURF-st.Req*0.35;P.surfCd=(P.surfCd||0)-dt;
  if(P.z>=top){
-  if(P.vz>spd*0.55&&P.surfCd<=0&&P.sym!=='radial'){P.air=true;P.vz=Math.max(P.vz,spd*0.95);splash(P.x,P.vz,false);if(!P.flags.jump){P.flags.jump=1;toast('Прыжок над водой! Удерживай «вверх» у поверхности, чтобы выпрыгивать.');}return;}
+  if(P.vz>spd*0.55&&P.surfCd<=0&&P.sym!=='radial'){P.air=true;P.vz=Math.max(P.vz,spd*0.95)*(P.un.leap?1.4:1);splash(P.x,P.vz,false);if(!P.flags.jump){P.flags.jump=1;toast('Прыжок над водой! Удерживай «вверх» у поверхности, чтобы выпрыгивать.');}return;}
   if(!P.atSurf){P.atSurf=true;splash(P.x,2,true);}
   P.z=top+Math.sin(P.time*2.2)*st.Req*0.12;if(P.vz>0)P.vz=0;
  }else P.atSurf=false;}
-function airTick(dt,dx){const st=P.st;const g=Math.max(40,st.speed*st.speed/(2.4*Math.max(st.L,8)));
+function airTick(dt,dx){const st=P.st;const g=Math.max(40,st.speed*st.speed/(2.4*Math.max(st.L,8)))*(P.un.leap?0.5:1);
  P.vz-=g*dt;P.vx+=(dx*st.speed*0.35-P.vx)*Math.min(1,dt*0.8);P.x=clamp(P.x+P.vx*dt,-HALF*0.95,HALF*0.95);P.z+=P.vz*dt;
  const want=Math.atan2(P.vz,Math.abs(P.vx)<1?(Math.cos(P.a)>=0?1:-1):P.vx);P.a+=clamp(angD(want,P.a),-5*dt,5*dt);P.mv=0.8;
  if(R_()<dt*8){const t=P.pos[P.pos.length-1];drops.push({x:t.x,z:t.z,vx:P.vx*0.3,vz:0,r:st.Req*0.12,g:st.Req*28});}
  if(P.z<SURF-st.Req*0.2&&P.vz<0){P.air=false;P.atSurf=false;P.surfCd=1.3;splash(P.x,-P.vz,false);P.vz*=0.3;P.o2=Math.min(1,P.o2+0.2);if(!P.flags.breath){P.flags.breath=1;toast('Глоток воздуха: у поверхности кислород восстанавливается быстрее.');}}}
-function matTick(dt){for(let q=0;q<40;q++){const k=(R_()*GN*GN)|0;if(TY[k]===3&&MAT[k]<1)MAT[k]=Math.min(1,MAT[k]+0.02);}}
+function dash(){if(!P.un.dash||!P.alive||P.bur||P.air||P.dashCd>0)return;P.dashT=0.5;P.dashCd=4;const t=P.pos[P.pos.length-1];for(let i=0;i<8;i++)bubbles.push({x:t.x+rnd(-1,1)*P.st.Req,z:t.z+rnd(-1,1)*P.st.Req,r:rnd(0.1,0.3)*P.st.Req,vz:rnd(2,5)*P.st.Req,ph:R_()*9});}
+function matTick(dt){for(let q=0;q<40;q++){const k=(R_()*GN)|0;if(TY[k]>=3&&MAT[k]<1)MAT[k]=Math.min(1,MAT[k]+0.02);}}
 /* ===== редактор ===== */
 let edSel=0,edPts=[],edSize=[0,0];
 const RADIAL_OK=['tentacle','eyes','cameye','spine','gill'];
@@ -198,8 +207,8 @@ $('eClose').onclick=closeEditor;
 function renderEditor(keepMsg){
  $('eBm').textContent=P.bm.toFixed(1);$('eDna').textContent=P.dna;
  // древо
- let h='',grp='';for(const n of NODES){if(n.grp!==grp){grp=n.grp;h+=`<div class="grp">${grp}</div>`;}const own=!!P.un[n.id],ok=n.req.every(r=>P.un[r]);
-  h+=`<button class="node ${own?'owned':ok?'':'locked'}" data-n="${n.id}"><span class="n">${n.ru}</span><span class="c">${own?'✓':n.cost+' ДНК'}</span><div class="d">${n.desc}${!ok&&!own?'<br>Нужно: '+n.req.filter(r=>!P.un[r]).map(r=>NODE[r].ru).join(', '):''}</div></button>`;}
+ let h='';for(const grp of[...new Set(NODES.map(n=>n.grp))]){h+=`<div class="grp">${grp}</div>`;for(const n of NODES.filter(q=>q.grp===grp)){const own=!!P.un[n.id],okR=n.req.every(r=>P.un[r]),okZ=!n.zone||P.samples[n.zone],ok=okR&&okZ;
+  h+=`<button class="node ${own?'owned':ok?'':'locked'}" data-n="${n.id}"><span class="n">${n.ru}${n.zone?` <span class="zb">${okZ?'◆':'🔒'} ${ZONES[n.zone].ru}</span>`:''}</span><span class="c">${own?'✓':n.cost+' ДНК'}</span><div class="d">${n.desc}${!okR&&!own?'<br>Нужно: '+n.req.filter(r=>!P.un[r]).map(r=>NODE[r].ru).join(', '):''}${!okZ&&!own?'<br>Нужен образец из зоны «'+ZONES[n.zone].ru+'» — съешь местного обитателя'+(n.zone==='lagoon'||n.zone==='seeps'?' или соскреби мат':'')+'.':''}</div></button>`;}}
  $('tree').innerHTML=h;for(const b of $('tree').querySelectorAll('.node'))b.onclick=()=>buyNode(b.dataset.n);
  // сегмент
  const b=P.body,i=edSel,sg=b.segs[i],n=b.segs.length,rad=b.sym==='radial';
@@ -227,7 +236,7 @@ function renderEditor(keepMsg){
  const st=P.st;const rows=[[rad?'Диаметр колокола':'Длина',lenMM().toFixed(1)+' мм / цель '+GOAL()],['Сегментов',n],['Масса',st.M.toFixed(1)],['Здоровье',st.hpMax.toFixed(0)],['Плавание',st.speed.toFixed(1)],['Ходьба по дну',st.crawl?st.crawl.toFixed(1):'—'],['Броня',st.armor<1?'−'+Math.round((1-st.armor)*100)+'% урона':'нет'],['Жабры',st.gill?st.gill.toFixed(1):'нет (дыхание кожей)'],['Зрение в темноте',Math.round(st.eyeQ*100)+'%'],['Укус',st.bite.toFixed(1)],['Глотает добычу до',Math.round(st.swallow*100)+'% своего размера'],['Шипы / яд',(st.spine?st.spine.toFixed(1):'—')+' / '+(st.sting?st.sting.toFixed(1):'—')],['Мозг',['нервные узлы','мозг I','мозг II','мозг III'][st.brain]]];
  $('stats').innerHTML=rows.map(r=>`<div class="stat"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
 }
-function buyNode(id){const n=NODE[id];if(P.un[id])return;if(!n.req.every(r=>P.un[r])){edMsg('Сначала открой: '+n.req.filter(r=>!P.un[r]).map(r=>NODE[r].ru).join(', '));return;}if(P.dna<n.cost){edMsg(`<span style="color:#ff9a8a">Нужно ${n.cost} ДНК, есть ${P.dna}. ДНК дают новые виды добычи, новые зоны, еда и вылупившиеся потомки.</span>`);return;}
+function buyNode(id){const n=NODE[id];if(P.un[id])return;if(n.zone&&!P.samples[n.zone]){edMsg(`Нужен образец из зоны «${ZONES[n.zone].ru}». Отправляйся туда и съешь местного обитателя.`);return;}if(!n.req.every(r=>P.un[r])){edMsg('Сначала открой: '+n.req.filter(r=>!P.un[r]).map(r=>NODE[r].ru).join(', '));return;}if(P.dna<n.cost){edMsg(`<span style="color:#ff9a8a">Нужно ${n.cost} ДНК, есть ${P.dna}. ДНК дают новые виды добычи, новые зоны, еда и вылупившиеся потомки.</span>`);return;}
  P.dna-=n.cost;P.un[id]=1;refreshStats();renderEditor();edMsg(`Открыто: <b>${n.ru}</b>. ${PARTS[id]?'Теперь эту часть можно добавить на тело (справа).':SKELS[id]?'Выбери этот скелет в разделе «Скелет».':''}`);
  if(id==='brain2')toast('Мозг II: теперь потомки могут плыть за тобой <b>стаей</b> (кнопка «Стая»)');}
 $('ecv').addEventListener('click',e=>{const r=$('ecv').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let bi=-1,bd=1e9;edPts.forEach((p,i)=>{const d=Math.hypot(p[0]-x,p[1]-y)-p[2];if(d<bd){bd=d;bi=i;}});if(bi>=0&&bd<40){edSel=bi;renderEditor();}});
@@ -268,7 +277,7 @@ function finish(p){P.done=true;P.path=p.id;const run={path:p.id,pathRu:p.ru,len:
  <div style="display:flex;gap:8px;margin-top:12px"><button class="on" id="fNew">Новая игра</button><button id="fStay">Плавать дальше</button></div>`;
  $('finalBox').innerHTML=h;$('fNew').onclick=()=>{localStorage.removeItem(SAVE);location.reload();};$('fStay').onclick=()=>{$('final').classList.add('hidden');paused=false;};}
 /* ===== сохранение ===== */
-function save(){if(!P.alive&&!P.done)return;try{const o={};for(const k of['sym','seed','body','un','x','y','z','a','hp','o2','sat','bm','dna','dnaF','gen','off','eaten','time','zones','flags','kills','eggsLaid','hatched','packOn','foodCount','home','done','path'])o[k]=P[k];o.packN=packCount();o.nests=nests.filter(n=>n.own&&n.eggs>0);localStorage.setItem(SAVE,JSON.stringify({v:1,P:o}));}catch(e){}}
+function save(){if(!P.alive&&!P.done)return;try{const o={};for(const k of['sym','seed','body','un','x','y','z','a','hp','o2','sat','bm','dna','dnaF','gen','off','eaten','time','zones','flags','kills','eggsLaid','hatched','packOn','foodCount','home','done','path','samples'])o[k]=P[k];o.packN=packCount();o.nests=nests.filter(n=>n.own&&n.eggs>0);localStorage.setItem(SAVE,JSON.stringify({v:1,P:o}));}catch(e){}}
 function loadSave(){try{const d=JSON.parse(localStorage.getItem(SAVE));return d&&d.v===1?d:null;}catch(e){return null;}}
 /* ===== HUD ===== */
 let hudT=0;
@@ -280,19 +289,21 @@ function hud(dt){hudT-=dt;if(hudT>0)return;hudT=0.12;const st=P.st;
  $('offTxt').textContent=`Потомков: ${P.off}`;$('packTxt').textContent=packMax()?`Стая: ${packCount()}/${packMax()}`:'';
  $('bEgg').classList.toggle('hidden',!ents.some(e=>e.sp==='kin'&&e.mate)&&!P.eggsLaid);$('bBur').classList.toggle('hidden',!P.un.burrow);$('bBur').classList.toggle('on',P.bur);
  $('bPack').classList.toggle('hidden',!packMax());$('bPack').classList.toggle('on',P.packOn);$('bPack').textContent=`Стая: ${P.packOn?'вкл':'выкл'}`;
- $('bFinal').classList.toggle('hidden',lenMM()<GOAL()||P.done);
- for(const[m,bn]of[['mEgg','bEgg'],['mBur','bBur'],['mPack','bPack'],['mFinal','bFinal']]){$(m).classList.toggle('hidden',$(bn).classList.contains('hidden'));$(m).classList.toggle('on',$(bn).classList.contains('on'));}
+ $('bFinal').classList.toggle('hidden',lenMM()<GOAL()||P.done);$('bDash').classList.toggle('hidden',!P.un.dash);$('bDash').classList.toggle('on',P.dashCd<=0);
+ for(const[m,bn]of[['mDash','bDash'],['mEgg','bEgg'],['mBur','bBur'],['mPack','bPack'],['mFinal','bFinal']]){$(m).classList.toggle('hidden',$(bn).classList.contains('hidden'));$(m).classList.toggle('on',$(bn).classList.contains('on'));}
  const zn=zoneAt(P.x,P.y),dep=Math.max(0,(SURF-P.z)/10).toFixed(0);$('info').innerHTML=`<b>${ZONES[zn].ru}</b> · глубина ${dep} м · ${floorTypeRu()}${P.bur?' · <b>закопан</b>':''}`;
- const G=[[P.foodCount>=5,'Поешь: планктон, мелкие рачки, водорослевые маты'],[P.flags.edit,'Открой «Эволюцию» (E) и измени тело'],[P.eggsLaid>0,'Найди сородича ♥ и отложи яйца (R)'],[P.st.gill>0&&P.zones.deep,'Отрасти жабры и спустись в Тёмную впадину'],[lenMM()>=GOAL(),`Вырасти до ${GOAL()} мм (${lenMM().toFixed(1)})`],[P.done,'Выбери путь развития']];
- const nx=G.findIndex(g=>!g[0]);$('goal').innerHTML=`<div class="t" style="font-weight:600;margin-bottom:4px">Цели этапа</div>`+G.map((g,i)=>`<div style="color:${g[0]?'#7fd09f':i===nx?'#ffe08a':'#8aa0b0'}">${g[0]?'✓':i===nx?'▸':'·'} ${g[1]}</div>`).join('')+`<div class="meter"><i style="width:${clamp(lenMM()/GOAL(),0,1)*100}%"></i></div><div class="small muted">Видов в рационе: ${Object.keys(P.eaten).length}/${Object.keys(SPEC).length} · Время: ${Math.floor(P.time/60)} мин</div>`;
+ const ns=SAMPLE_Z.filter(z=>P.samples[z]).length;const G=[[P.foodCount>=5,'Поешь: планктон, мелкие рачки, водорослевые маты'],[P.flags.edit,'Открой «Эволюцию» и измени тело'],[P.eggsLaid>0,'Отложи икру в лагуне или на рифе (найди сородича ♥)'],[ns>=4,`Собери образцы четырёх зон (${ns}/4)`],[P.st.gill>0&&P.zones.deep,'Отрасти жабры и спустись на глубоководную равнину'],[lenMM()>=GOAL(),`Вырасти до ${GOAL()} мм (${lenMM().toFixed(1)})`],[P.done,'Выбери путь развития']];
+ const nx=G.findIndex(g=>!g[0]);$('goal').innerHTML=`<div class="t" style="font-weight:600;margin-bottom:4px">Цели этапа</div>`+G.map((g,i)=>`<div style="color:${g[0]?'#7fd09f':i===nx?'#ffe08a':'#8aa0b0'}">${g[0]?'✓':i===nx?'▸':'·'} ${g[1]}</div>`).join('')+`<div class="small" style="margin-top:5px">${SAMPLE_Z.map(z=>`<div style="color:${P.samples[z]?'#7fd09f':'#a8b8c4'}">${P.samples[z]?'◆':'◇'} ${ZONES[z].ru}${P.samples[z]?'':' '+zoneDir(z)}</div>`).join('')}</div><div class="meter"><i style="width:${clamp(lenMM()/GOAL(),0,1)*100}%"></i></div><div class="small muted">Видов в рационе: ${Object.keys(P.eaten).length}/${Object.keys(SPEC).length} · Время: ${Math.floor(P.time/60)} мин</div>`;
  hints();}
-function floorTypeRu(){return{sand:'песок',mud:'ил',rock:'скалы',mat:'водорослевый мат'}[floorType(P.x,P.y)];}
+function zoneRange(z){let a=-HALF;for(const[n,b]of ZONE_X){if(n===z)return[a,Math.min(b,HALF)];a=b;}return[a,HALF];}
+function zoneDir(z){const[a,b]=zoneRange(z);if(P.x>=a&&P.x<=b)return'— ты здесь';const d=P.x<a?a-P.x:P.x-b;return(P.x<a?'→ ':'← ')+(d/10>=1000?(d/10000).toFixed(1)+' км':Math.round(d/10)+' м');}
+function floorTypeRu(){return{sand:'песок',mud:'ил',rock:'скалы',mat:'водорослевый мат',seep:'бактериальный мат'}[floorType(P.x)];}
 const HINTS=[[()=>P.o2<0.35&&P.z>SURF*0.75,'Кислорода мало — всплыви к самой поверхности: там можно сделать вдох.'],[()=>P.time<14&&touchUI,'Коснись экрана и веди пальцем — это джойстик. Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<14,'Плыви за курсором мыши или WASD (W/Пробел — вверх, S/Shift — вниз). Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<40&&P.bm>=8&&!P.flags.edit,touchUI?'Накопились питательные вещества — нажми «Эволюция»: добавь сегмент или увеличь тело.':'Накопились питательные вещества — нажми <b>E</b>: добавь сегмент или увеличь тело.'],[()=>ents.some(e=>e.sp==='kin'&&e.mate&&d3(e,P)<P.st.L*6+30)&&!P.eggsLaid,'Рядом сородич с ♥. Подплыви вплотную и нажми <b>R</b>, чтобы отложить яйца: потомки — это запасные жизни.'],[()=>P.o2<0.35,'Кислорода мало: поднимись выше (Пробел). Жабры позволяют дышать глубже.'],[()=>lenMM()>=GOAL()&&!P.done,'Ты достаточно вырос — нажми «Завершить этап», чтобы выбрать путь развития.']];
 function hints(){const h=HINTS.find(q=>q[0]());$('hint').style.display=h?'':'none';if(h)$('hint').innerHTML=h[1];}
 /* ===== отрисовка ===== */
 function drawArrows(){const list=[];
  for(const e of ents){if(e.gone)continue;if(e.sp==='kin'&&e.mate)list.push([e,'rgba(255,140,190,0.9)']);else if(P.st.antenna&&e.S.beh==='hunt'&&e.tgt===P)list.push([e,'rgba(255,90,80,0.95)']);}
- for(const n of nests)if(n.own&&n.eggs)list.push([n,'rgba(255,230,140,0.9)']);
+ for(const n of nests)if(n.own&&n.eggs)list.push([n,'rgba(255,230,140,0.9)']);if(P.un.scav)for(const c of carr)if(c.val>2)list.push([c,'rgba(190,140,90,0.85)']);
  for(const[o,c]of list){const p=proj(o.x,o.y,o.z);if(p[0]>20&&p[0]<W-20&&p[1]>20&&p[1]<H-20)continue;const a=Math.atan2(p[1]-H/2,p[0]-W/2);const r=Math.min(W,H)*0.44;const x=W/2+Math.cos(a)*Math.min(r*1.4,W/2-24),y=H/2+Math.sin(a)*Math.min(r,H/2-24);ctx.fillStyle=c;ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-6,-7);ctx.lineTo(-3,0);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();ctx.restore();}}
 function render(dt){
  drawWater();drawParallax();drawRays();drawFloorBack();drawFloorFront();ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -301,8 +312,8 @@ function render(dt){
  for(const n of nests)drawNest(n);for(const c of carr)drawCarrion(c);for(const f of foods)drawFood(f);
  const list=ents.filter(e=>!e.gone&&Math.abs(e.x-cam.x)<vr).sort((a,b)=>b.st.Req-a.st.Req);
  for(const e of list)drawEnt(e);if(P.alive)drawPlayer();drawFx();
- for(let k=k0;k<decor.length;k++){const d=decor[k];if(Math.abs(d.x-cam.x)<vr)drawDecor(d);}
- drawSnow(dt);const pp=proj(P.x,0,P.z);drawDark(pp[0],pp[1],cam.z,P.st.eyeQ);drawArrows();
+ for(let k=k0;k<decor.length;k++){const d=decor[k];if(Math.abs(d.x-cam.x)<vr)drawDecor(d);}ctx.globalAlpha=1;
+ drawCurrents(dt);drawSnow(dt);const pp=proj(P.x,0,P.z);drawDark(pp[0],pp[1],cam.z,P.st.eyeQ);drawArrows();
  if(P.hit>0){ctx.fillStyle=`rgba(200,30,30,${P.hit*0.5})`;ctx.fillRect(0,0,W,H);}
  if(P.o2<0.25&&P.alive){const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.7);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,`rgba(10,20,60,${(0.25-P.o2)*2.4})`);ctx.fillStyle=v;ctx.fillRect(0,0,W,H);}
 }
@@ -325,7 +336,7 @@ function begin(sym,data){
  if(data){placePlayer(data.P.x,data.P.y);P.z=data.P.z;for(const n of data.nests||[])nests.push(n);}
  else{const[x,y]=findSpawn();placePlayer(x,y);toast('<b>Кембрий, 520 млн лет назад.</b> Ты — крошечный донный червячок. Расти, размножайся и стань кем-то большим.');}
  ents.length=0;foods.length=0;carr.length=0;if(P.packOn)for(let k=0;k<(data&&data.P.packN||0);k++)spawnPackMember();
- for(let k=0;k<20;k++)popTick(0.1);for(let k=0;k<60;k++)addPlankton(P.x+rnd(-60,60),P.y+rnd(-60,60),clamp(P.z+rnd(-25,30),floorH(P.x,P.y)+3,SURF-4));
+ spawnInView=true;for(let k=0;k<6;k++)popTick(0.1);spawnInView=false;for(let k=0;k<10;k++)popTick(0.1);for(let k=0;k<60;k++)addPlankton(P.x+rnd(-60,60),P.y+rnd(-60,60),clamp(P.z+rnd(-25,30),floorH(P.x,P.y)+3,SURF-4));
  $('hTitle').textContent=`Поколение ${P.gen}`;$('start').classList.add('hidden');paused=false;save();}
 $('bNew').onclick=()=>begin(selSym,null);$('bCont').onclick=()=>begin(sv0.P.sym,sv0);
 /* ===== цикл ===== */
@@ -335,6 +346,6 @@ function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
  else T_+=dt*0.5;
  cam.ts=camScale();camUpdate(P.x,P.y,P.z,dt);render(dt);if(edOpen)drawEd();hud(dt);
  requestAnimationFrame(frame);}
-genWorld(7);genDecor(7);P.st=bodyStats(P.body,P.un);placePlayer(-9000,0);
+genWorld(7);genDecor(7);P.st=bodyStats(P.body,P.un);placePlayer(-10400,0);
 requestAnimationFrame(frame);
 window.__G={get P(){return P;},ents,foods,nests,carr,SPEC,begin,openEditor,closeEditor,tryEdit,buyNode,cam,openFinal,layEggs};

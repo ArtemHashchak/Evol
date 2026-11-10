@@ -18,11 +18,11 @@ const PARTS={
 const SKELS={none:{ru:'Мягкое тело',desc:'Гибкое, плывёт волной, может закапываться.'},exo:{ru:'Панцирь',node:'exo',desc:'Хитиновый экзоскелет, как у трилобита: урон −40%, но тело жёстче и медленнее плывёт волной.'},notochord:{ru:'Хорда',node:'notochord',desc:'Упругий стержень вдоль спины, как у пикайи: сильное плавание волной. Шаг к позвоночным.'},shell:{ru:'Раковина',node:'shell',desc:'Известковая раковина над передними сегментами: урон −50%, но тяжело плыть. Шаг к моллюскам.'}};
 const NODES=[
  {id:'fin',ru:'Плавники',grp:'Движение',cost:4,req:[]},
- {id:'tailfin',ru:'Хвостовой плавник',grp:'Движение',cost:9,req:['fin']},
+ {id:'tailfin',ru:'Хвостовой плавник',grp:'Движение',cost:9,req:['fin'],zone:'currents'},
  {id:'leg',ru:'Ножки-лобоподии',grp:'Движение',cost:4,req:[]},
  {id:'jleg',ru:'Членистые ноги',grp:'Движение',cost:9,req:['leg','exo']},
  {id:'gill',ru:'Жабры',grp:'Дыхание',cost:5,req:[]},
- {id:'biggill',ru:'Перистые жабры',grp:'Дыхание',cost:9,req:['gill'],desc:'Жабры работают в 1.7 раза лучше.'},
+ {id:'biggill',ru:'Перистые жабры',grp:'Дыхание',cost:9,req:['gill'],zone:'seeps',desc:'Жабры работают в 1.7 раза лучше.'},
  {id:'cameye',ru:'Глаза-камеры',grp:'Чувства',cost:8,req:[]},
  {id:'compound',ru:'Фасеточные глаза',grp:'Чувства',cost:9,req:['exo']},
  {id:'antenna',ru:'Усики',grp:'Чувства',cost:4,req:[]},
@@ -31,15 +31,26 @@ const NODES=[
  {id:'proboscis',ru:'Хоботок',grp:'Оружие',cost:8,req:[]},
  {id:'spine',ru:'Шипы',grp:'Оружие',cost:4,req:[]},
  {id:'tentacle',ru:'Щупальца',grp:'Оружие',cost:5,req:[]},
- {id:'exo',ru:'Панцирь',grp:'Скелет',cost:10,req:[],desc:SKELS.exo.desc},
+ {id:'exo',ru:'Панцирь',grp:'Скелет',cost:10,req:[],zone:'reef',desc:SKELS.exo.desc+' Нужна известь с рифов.'},
  {id:'notochord',ru:'Хорда',grp:'Скелет',cost:10,req:[],desc:SKELS.notochord.desc},
- {id:'shell',ru:'Раковина',grp:'Скелет',cost:10,req:[],desc:SKELS.shell.desc},
+ {id:'shell',ru:'Раковина',grp:'Скелет',cost:10,req:[],zone:'reef',desc:SKELS.shell.desc+' Нужна известь с рифов.'},
  {id:'brain1',ru:'Мозг I',grp:'Ум',cost:6,req:[],desc:'Нервные узлы сливаются в головной мозг: быстрее реакция (+поворот).'},
  {id:'brain2',ru:'Мозг II',grp:'Ум',cost:10,req:['brain1'],desc:'Сложное поведение: потомки могут следовать за тобой стаей.'},
  {id:'brain3',ru:'Мозг III',grp:'Ум',cost:14,req:['brain2'],desc:'Стая больше и умнее: защищает тебя и охотится вместе.'},
  {id:'clutch',ru:'Крупная кладка',grp:'Размножение',cost:6,req:[],desc:'В кладке на 2 яйца больше.'},
  {id:'care',ru:'Забота о потомстве',grp:'Размножение',cost:8,req:['clutch'],desc:'Яйца созревают вдвое быстрее, хищники их не трогают.'},
- {id:'burrow',ru:'Рытьё',grp:'Укрытие',cost:6,req:[],desc:'Закапываешься в песок или ил (B): хищники не видят, но двигаться нельзя.'}
+ {id:'burrow',ru:'Рытьё',grp:'Укрытие',cost:6,req:[],desc:'Закапываешься в песок или ил (B): хищники не видят, но двигаться нельзя.'},
+ {id:'fastburrow',ru:'Быстрое рытьё',grp:'Движение',cost:8,req:['burrow'],zone:'lagoon',desc:'Закапываешься в любой мягкий грунт и можешь медленно ползти под землёй.'},
+ {id:'dash',ru:'Реактивный рывок',grp:'Движение',cost:8,req:[],desc:'Резкий выброс воды (Q): на полсекунды скорость ×2.6. Перезарядка 4 с.'},
+ {id:'streamline',ru:'Обтекаемое тело',grp:'Движение',cost:9,req:['fin'],zone:'currents',desc:'Плавание на 20% быстрее, течение сносит слабее.'},
+ {id:'sucker',ru:'Присоски',grp:'Движение',cost:7,req:['leg'],zone:'currents',desc:'У дна тебя не сносит течением, а по скалам ходишь вдвое быстрее.'},
+ {id:'leap',ru:'Мощный прыжок',grp:'Движение',cost:7,req:['tailfin'],desc:'Выпрыгиваешь из воды в 2 раза выше и дольше паришь.'},
+ {id:'filter',ru:'Фильтрация',grp:'Питание',cost:6,req:[],zone:'currents',desc:'Цедишь воду: ловишь планктон на большом расстоянии, и он вдвое сытнее.'},
+ {id:'radula',ru:'Тёрка-радула',grp:'Питание',cost:6,req:[],zone:'lagoon',desc:'Соскребаешь водорослевые и бактериальные маты вдвое быстрее.'},
+ {id:'symb',ru:'Симбиоз с водорослями',grp:'Питание',cost:9,req:['radula'],zone:'lagoon',desc:'Водоросли в коже кормят тебя на свету (на мелководье сытость растёт сама).'},
+ {id:'scav',ru:'Падальщик',grp:'Питание',cost:5,req:[],desc:'Падаль даёт в 1.6 раза больше, коричневые стрелки ведут к ней.'},
+ {id:'stomach',ru:'Мощный желудок',grp:'Питание',cost:9,req:['jaws'],desc:'Из добычи усваивается на 40% больше питательных веществ.'},
+ {id:'chemo',ru:'Хемосинтез',grp:'Питание',cost:12,req:['scav'],zone:'seeps',desc:'Бактерии-симбионты кормят тебя в темноте глубин и снижают потребность в кислороде.'}
 ];
 for(const n of NODES){if(!n.desc)n.desc=PARTS[n.id]?PARTS[n.id].desc:'';}
 const NODE=Object.fromEntries(NODES.map(n=>[n.id,n]));
@@ -59,7 +70,7 @@ function bodyStats(b,un){
  const crawl=(c.leg||0)*0.55+(c.jleg||0)*1.1;
  const shellPen=b.skel==='shell'?0.7:1;
  const st={n,M,L:radial?segs[0].r*2:L,Req,c,radial};
- st.speed=11*Math.pow(thr,0.7)*Math.pow(Req,0.55)*shellPen*(radial?0.75:1);
+ st.speed=11*Math.pow(thr,0.7)*Math.pow(Req,0.55)*shellPen*(radial?0.75:1)*(un.streamline?1.2:1);
  st.crawl=crawl>0?9*Math.pow(1+crawl,0.65)*Math.pow(Req,0.55):0;
  st.turn=(radial?1.6:2.6)*(1+0.12*(c.fin||0)+(un.brain1?0.25:0))/Math.pow(Req,0.22);
  let hp=0;for(const s of segs)hp+=8*s.r*s.r+4;st.hpMax=hp*(radial?1.5:1);

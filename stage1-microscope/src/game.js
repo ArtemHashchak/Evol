@@ -13,7 +13,7 @@ function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=inne
 addEventListener('resize',resize);resize();
 
 /* ========== константы ========== */
-const CELL_R=10,HEX=2*CELL_R*0.9/SQ3,DROP_R=7000,GOAL_CELLS=30;
+const CELL_R=10,HEX=2*CELL_R*0.9/SQ3,DROP_R=14000,WK=DROP_R/7000,GOAL_CELLS=30;
 const HDIR=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
 const hexXY=(q,r)=>[HEX*SQ3*(q+r/2),HEX*1.5*r];
 const OBJ=[{m:100,d:220},{m:40,d:550},{m:20,d:1100},{m:10,d:2200}];
@@ -217,7 +217,7 @@ function flow(x,y){return[Math.sin(y*0.0021+T*0.13)*7+Math.sin((x+y)*0.0013-T*0.
 function lightAt(x,y){return lightAt0(x,y)*(0.12+0.88*DAYK);}
 function lightAt0(x,y){let L=0.15+0.2*surfAt(x,y);for(const l of lights){const d2=((x-l.x)**2+(y-l.y)**2)/(l.r*l.r);if(d2<1)L=Math.max(L,0.15+0.85*(1-d2)*(1-d2));}return L*(1-0.65*siltAt(x,y))*(inThicket(x,y)?0.8:1);}
 function initWorld(){
- lights=[];let lt=0;while(lights.length<22&&lt++<400){const a=rnd(0,TAU),d=Math.sqrt(R_())*DROP_R*0.92;const x=Math.cos(a)*d,y=Math.sin(a)*d;const z=zoneZ(x,y);if(z>0.6||(z>0.45&&R_()<0.6))continue;lights.push({x,y,r:rnd(350,900)*(z<0.36?1.3:1),vx:rnd(-3,3),vy:rnd(-3,3)});}
+ lights=[];let lt=0;while(lights.length<Math.round(22*WK*WK)&&lt++<1600){const a=rnd(0,TAU),d=Math.sqrt(R_())*DROP_R*0.92;const x=Math.cos(a)*d,y=Math.sin(a)*d;const z=zoneZ(x,y);if(z>0.6||(z>0.45&&R_()<0.6))continue;lights.push({x,y,r:rnd(350,900)*(z<0.36?1.3:1),vx:rnd(-3,3),vy:rnd(-3,3)});}
  lights[0].x=120;lights[0].y=-60;lights[0].r=420;
  ents=[];parts=[];slime=[];pops=[];shots=[];
  for(let i=0;i<170;i++)parts.push({x:rnd(-1,1),y:rnd(-1,1),z:rnd(0.2,1),r:rnd(0.3,1.1),init:1});
@@ -254,7 +254,7 @@ function zoneName(x,y){if(inThicket(x,y))return'thicket';const z=zoneZ(x,y);retu
 const ZONES={surface:{ru:'Светлое мелководье',info:'Много света: растут водоросли, плавают эвглены и вольвоксы. Хлоропласты работают в полную силу.'},silt:{ru:'Илистое дно',info:'Темно и мутно, мало света, зато много бактерий и детрита. Здесь живут амёбы и нематоды, а в иле лежат древние споры.'},thicket:{ru:'Заросли нитчатки',info:'Лабиринт из нитей водоросли спирогиры. Мелкий проскользнёт между нитями, а крупные хищники и циклоп сюда не пролезут — хорошее укрытие.'},open:{ru:'Открытая вода',info:'Толща воды между мелководьем и дном.'}};
 const ZW={surface:{euglena:2,volvox:2,paramecium:1.3,amoeba:0.4,nematode:0.3,tardigrade:0.3,hydra:0.6},silt:{amoeba:2.2,nematode:2.5,heliozoa:1.3,euglena:0.3,volvox:0.3,tardigrade:1.8,diatom:1.4,stentor:0.6},thicket:{rotifer:2,hydra:2.5,diatom:1.8,vorticella:3,stentor:1.5,amoeba:0.3,tardigrade:0.2,volvox:0.3},open:{}};
 function makeThickets(){const r=srand(P.sporeSeed+77);ZP=[r()*6,r()*6,r()*6];thickets=[];let tries=0;
- while(thickets.length<6&&tries++<300){const a=r()*TAU,d=900+r()*5300;const x=Math.cos(a)*d,y=Math.sin(a)*d;if(zoneZ(x,y)>0.6)continue;if(thickets.some(t=>Math.hypot(t.x-x,t.y-y)<t.r+1100))continue;
+ while(thickets.length<Math.round(6*WK*WK)&&tries++<1200){const a=r()*TAU,d=900+r()*(DROP_R-1700);const x=Math.cos(a)*d,y=Math.sin(a)*d;if(zoneZ(x,y)>0.6)continue;if(thickets.some(t=>Math.hypot(t.x-x,t.y-y)<t.r+1100))continue;
   const t={x,y,r:520+r()*380,fil:[]};const nf=10+((r()*5)|0);
   for(let i=0;i<nf;i++){let px=x+(r()-0.5)*t.r*1.7,py=y+(r()-0.5)*t.r*1.7,ang=r()*TAU;const pts=[];for(let k=0;k<30;k++){if((px-x)**2+(py-y)**2<(t.r*1.05)**2)pts.push([px,py]);ang+=(r()-0.5)*0.32;px+=Math.cos(ang)*32;py+=Math.sin(ang)*32;}
    if(pts.length>3)t.fil.push({pts,seed:r()});}
@@ -264,7 +264,7 @@ function filPush(x,y,rad){let px=0,py=0;for(const t of thickets){const dd=Math.h
   for(const f of t.fil){const p=f.pts;for(let i=0;i<p.length-1;i++){const ax=p[i][0],ay=p[i][1],bx=p[i+1][0],by=p[i+1][1];const vx=bx-ax,vy=by-ay,L2=vx*vx+vy*vy;let u=((x-ax)*vx+(y-ay)*vy)/L2;u=u<0?0:u>1?1:u;const cx=ax+vx*u,cy=ay+vy*u,dx=x-cx,dy=y-cy,d=Math.hypot(dx,dy);const m=rad+FIL_R-d;if(m>0&&d>0.01){px+=dx/d*m;py+=dy/d*m;}}}}
  return[px,py];}
 let molds=[];
-function makeMolds(){const r=srand(P.sporeSeed+313);molds=[];for(let i=0;i<3;i++){let x=0,y=0;for(let k=0;k<80;k++){const a=r()*TAU,d=1500+r()*5000;x=Math.cos(a)*d;y=Math.sin(a)*d;if(siltAt(x,y)>0.7&&!inThicket(x,y))break;}molds.push({x,y,nodes:[{x,y,p:-1,d:0,kids:0}],growT:0,eatT:0,regrow:0,seen:false});}}
+function makeMolds(){const r=srand(P.sporeSeed+313);molds=[];for(let i=0;i<Math.round(3*WK*WK);i++){let x=0,y=0;for(let k=0;k<80;k++){const a=r()*TAU,d=1500+r()*(DROP_R-2000);x=Math.cos(a)*d;y=Math.sin(a)*d;if(siltAt(x,y)>0.7&&!inThicket(x,y))break;}molds.push({x,y,nodes:[{x,y,p:-1,d:0,kids:0}],growT:0,eatT:0,regrow:0,seen:false});}}
 function moldUpdate(dt){
  for(const m of molds){
   if(Math.hypot(m.x-P.x,m.y-P.y)>3200)continue;
@@ -356,7 +356,7 @@ function bossCheck(dt){
  spawnEnt(id,x,y);toast('<b>Мини-босс зоны «'+ZONES[zn].ru+'»:</b> '+SP[id].ru+'. '+SP[id].info+' Победи его — получишь уникальную мутацию.');
 }
 function bossKilled(e){const id=e.sp;if(P.bossDone[id])return;P.bossDone[id]=1;const node={chaos:'phago',asplanchna:'mastax',oldhydra:'nemabat'}[id];P.un[node]=1;derive();P.dna+=12;toast('<b>Мини-босс побеждён!</b> Трофей: <b>'+NODE[node].ru+'</b> — '+NODE[node].desc+' И +12 ДНК.');save();}
-function makeSpores(){makeThickets();makeMolds();const r=srand(P.sporeSeed);spores=[];for(let i=0;i<8;i++){let x=0,y=0;for(let k=0;k<60;k++){const a=r()*TAU,d=1300+r()*5300;x=Math.cos(a)*d;y=Math.sin(a)*d;if(siltAt(x,y)>0.5&&!inThicket(x,y))break;}spores.push({id:i,x,y,prog:0,seed:r()});}}
+function makeSpores(){makeThickets();makeMolds();const r=srand(P.sporeSeed);spores=[];for(let i=0;i<Math.round(8*WK*WK);i++){let x=0,y=0;for(let k=0;k<60;k++){const a=r()*TAU,d=1300+r()*(DROP_R-1700);x=Math.cos(a)*d;y=Math.sin(a)*d;if(siltAt(x,y)>0.5&&!inThicket(x,y))break;}spores.push({id:i,x,y,prog:0,seed:r()});}}
 function spawnCyclops(kind){kind=kind||(R_()<0.5?'cyclops':'daphnia');const a=rnd(0,TAU),d=viewD()*0.9+800;let x=P.x+Math.cos(a)*d,y=P.y+Math.sin(a)*d;const l=Math.hypot(x,y);if(l>DROP_R*0.95){x*=DROP_R*0.95/l;y*=DROP_R*0.95/l;}const e=spawnEnt(kind,x,y);e.a=Math.atan2(P.y-y,P.x-x);e.life=rnd(120,160);e.deaths0=P.stats.deaths;cycE=e;toast(kind==='cyclops'?'Вода дрогнула — в каплю попал <b>циклоп</b>! Все разбегаются. Не попадайся ему в пасть. Заросли нитчатки — хорошее укрытие.':'Капля качнулась — прискакала <b>дафния</b>! Она фильтрует воду и затягивает всё мелкое. Держись подальше или прячься в зарослях.');}
 function doZap(){if(!hasN('electro')||P.zapCd>0||paused||!started)return;P.zapCd=8;const rr=D.R+90;zaps.push({x:P.x,y:P.y,r:rr,t:0.45});for(const e of ents){const s=SP[e.sp];if(!s||s.kind==='food'||e.ally||e.eaten||e.dead)continue;if(Math.hypot(e.x-P.x,e.y-P.y)-e.r<rr){e.hp-=15;e.aggro=2;e.poison=Math.max(e.poison||0,1);if(e.hp<=0)killEnt(e);}}}
 function updateSpores(dt){
@@ -583,7 +583,8 @@ function updateEnts(dt){
    e.x+=(e.ax-e.x)*dt;e.y+=(e.ay-e.y)*dt;e.a+=Math.sin(e.t*0.3)*dt*0.1;spd=0;
    const fx=Math.cos(e.a),fy=Math.sin(e.a),cx=e.x+fx*e.r*0.85,cy=e.y+fy*e.r*0.85;
    for(const o of ents){if(o.eaten||o===e||o.r>e.r*0.15)continue;const vx=cx-o.x,vy=cy-o.y,vl=Math.hypot(vx,vy);if(vl<e.r*0.9&&vl>1){o.x+=(vx/vl*40-vy/vl*25)*dt;o.y+=(vy/vl*40+vx/vl*25)*dt;if(vl<e.r*0.12){o.eaten=0.001;o.by=e;}}}
-   if(pR<e.r*0.12){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy);if(vl<e.r*0.9){P.x+=(vx/vl*28-vy/vl*18)*dt;P.y+=(vy/vl*28+vx/vl*18)*dt;if(vl<e.r*0.15){deathCause='засосал трубач';hurt(20*dt,null);}}}
+   if(!host&&P.inv<=0&&D.pl<tierOf(e)&&pR<e.r*0.5){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy),reach=e.r*1.35;if(vl<reach&&vl>0.5){const k=1-vl/reach,pull=25+75*k*k;P.x+=(vx/vl*pull-vy/vl*pull*0.55)*dt;P.y+=(vy/vl*pull+vx/vl*pull*0.55)*dt;e.suck=1;if(!P.hintsDone.stentor){P.hintsDone.stentor=1;toast('<b>Трубач затягивает тебя в воронку!</b> Плыви прочь изо всех сил или делай рывок — в его рту не выжить.');}
+    if(vl<e.r*0.16+pR*0.3){deathCause='всосан трубачом';P.hp=0;hurt(D.hpMax*5,null);}}}
   }else if(s.beh==='egg'){spd=0;
   }else if(s.beh==='hydra'){
    e.x+=(e.ax-e.x)*dt;e.y+=(e.ay-e.y)*dt;e.a+=Math.sin(e.t*0.25)*dt*0.15;spd=0;

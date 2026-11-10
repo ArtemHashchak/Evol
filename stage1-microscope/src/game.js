@@ -583,8 +583,8 @@ function updateEnts(dt){
    e.x+=(e.ax-e.x)*dt;e.y+=(e.ay-e.y)*dt;e.a+=Math.sin(e.t*0.3)*dt*0.1;spd=0;e.suckK=Math.max(0,(e.suckK||0)-dt*1.5);
    const fx=Math.cos(e.a),fy=Math.sin(e.a),cx=e.x+fx*e.r*0.85,cy=e.y+fy*e.r*0.85;
    for(const o of ents){if(o.eaten||o===e||o.r>e.r*0.15)continue;const vx=cx-o.x,vy=cy-o.y,vl=Math.hypot(vx,vy);if(vl<e.r*0.9&&vl>1){o.x+=(vx/vl*40-vy/vl*25)*dt;o.y+=(vy/vl*40+vx/vl*25)*dt;if(vl<e.r*0.12){o.eaten=0.001;o.by=e;}}}
-   if(!host&&P.inv<=0&&D.pl<tierOf(e)&&pR<e.r*0.5){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy),reach=e.r*1.35;if(vl<reach&&vl>0.5){const k=1-vl/reach,pull=25+75*k*k;e.suckK=Math.max(e.suckK,0.4+0.6*k);P.suckK=k;P.suckX=cx;P.suckY=cy;P.suckT=0.2;P.x+=(vx/vl*pull-vy/vl*pull*0.55)*dt;P.y+=(vy/vl*pull+vx/vl*pull*0.55)*dt;if(!P.hintsDone.stentor){P.hintsDone.stentor=1;toast('<b>Трубач затягивает тебя в воронку!</b> Плыви прочь изо всех сил или делай рывок — в его рту не выжить.');}
-    if(vl<e.r*0.16+pR*0.3){deathCause='всосан трубачом';P.hp=0;hurt(D.hpMax*5,null);}}}
+   if(!host&&P.inv<=0&&D.pl<tierOf(e)&&pR<e.r*0.5){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy),reach=e.r*1.35;if(vl<reach&&vl>0.5){const k=1-vl/reach,pull=25+75*k*k;e.suckK=Math.max(e.suckK,0.4+0.6*k);P.suckK=k;P.suckX=cx;P.suckY=cy;P.suckT=0.2;const tg=0.45*(1-k);P.x+=(vx/vl*pull-vy/vl*pull*tg)*dt;P.y+=(vy/vl*pull+vx/vl*pull*tg)*dt;if(!P.hintsDone.stentor){P.hintsDone.stentor=1;toast('<b>Трубач затягивает тебя в воронку!</b> Плыви прочь изо всех сил или делай рывок — в его рту не выжить.');}
+    if(vl<e.r*0.24+pR*0.6){deathCause='всосан трубачом';P.hp=0;hurt(D.hpMax*5,null);}}}
   }else if(s.beh==='egg'){spd=0;
   }else if(s.beh==='hydra'){
    e.x+=(e.ax-e.x)*dt;e.y+=(e.ay-e.y)*dt;e.a+=Math.sin(e.t*0.25)*dt*0.15;spd=0;
@@ -651,6 +651,7 @@ function updateEnts(dt){
  ents=ents.filter(e=>!(e.eaten>=1)&&!e.dead);
 }
 /* столкновения игрока */
+function effR(e,x,y){const w=WR[e.sp];if(!w||w>=0.95)return e.r;const L=e.sp==='nematode'?e.r*1.5:e.r;const th=Math.atan2(y-e.y,x-e.x)-e.a;const c=Math.cos(th),sn=Math.sin(th);return L*w/Math.sqrt((w*c)**2+sn*sn);}
 function collide(dt){if(host)return;
  const pR=D.R;
  if(thickets.some(t=>Math.hypot(P.x-t.x,P.y-t.y)<t.r*1.1+pR)){let sx=0,sy=0,n=0;for(const w of D.cw){const[px,py]=filPush(w.wx,w.wy,CELL_R*0.95);if(px||py){sx+=px;sy+=py;n++;}}if(n){P.x+=sx/n;P.y+=sy/n;const vl=Math.hypot(sx,sy)||1;const dot=(P.vx*sx+P.vy*sy)/vl;if(dot<0){P.vx-=sx/vl*dot;P.vy-=sy/vl*dot;}}}
@@ -660,7 +661,7 @@ function collide(dt){if(host)return;
   if(Math.abs(dx)>pR+reach+4||Math.abs(dy)>pR+reach+4)continue;
   const dP=Math.hypot(dx,dy);if(dP>pR+reach+4)continue;
   if(e.sp==='heliozoa'&&dP<pR+e.r*2.1&&pR<e.r*1.6&&P.inv<=0){P.vx*=0.85;P.vy*=0.85;deathCause='прилип к солнечнику';hurt(2.5*dt,null);}
-  const[cd,cw]=nearestCellDist(e.x,e.y);const ov=CELL_R+e.r-cd;
+  const[cd,cw]=nearestCellDist(e.x,e.y);const er=effR(e,cw.wx,cw.wy);const ov=CELL_R+er-cd;
   if(ov<=0)continue;
   if(e.sp==='kin'||e.ally||e.rival){continue;}
   if(!s||s.kind==='food'){eatEnt(e);continue;}
@@ -670,7 +671,7 @@ function collide(dt){if(host)return;
   if(e.sp==='diatom'&&!hasN('jaws')&&P.inv<=0&&Math.hypot(P.vx,P.vy)>D.speed*0.3){deathCause='порезался о диатомею';hurt(2.5*dt,cw);}
   // атаки игрока
   let attacked=false;
-  for(const w of D.cw){if(!w.edge)continue;if(w.t!=='spike'&&w.t!=='mouth')continue;const d=Math.hypot(w.wx-e.x,w.wy-e.y);if(d>CELL_R*1.6+e.r)continue;
+  for(const w of D.cw){if(!w.edge)continue;if(w.t!=='spike'&&w.t!=='mouth')continue;const d=Math.hypot(w.wx-e.x,w.wy-e.y);if(d>CELL_R*1.6+effR(e,w.wx,w.wy))continue;
    if(w.t==='spike'){e.hp-=D.spikeDps*dt*weak*(e.sp==='diatom'?0.4:1);if(hasN('barb'))e.poison=3;attacked=true;}
    else{const dm=D.mouthDps*dt*weak*(e.sp==='diatom'&&!hasN('jaws')?0.5:1);e.hp-=dm;gain(dm*s.food/s.hp*0.6);attacked=true;}}
   if(hasN('mastax')){let k=0;for(const w of D.cw){if(!w.edge||k>=3)continue;if(Math.hypot(w.wx-e.x,w.wy-e.y)<CELL_R*1.3+e.r){k++;const dm=2.5*dt*weak;e.hp-=dm;gain(dm*s.food/s.hp*0.4);attacked=true;}}}
@@ -679,6 +680,7 @@ function collide(dt){if(host)return;
   if(s.beh==='amoeba'&&pR<e.r*0.6){deathCause='переварен амёбой';hurt((s.edmg||7)*dt*(1-0.4*D.armorFrac),cw);P.x+=(e.x-P.x)*dt*0.8;P.y+=(e.y-P.y)*dt*0.8;continue;}
   let rotBite=false;if(s.beh==='rotifer'&&pR<e.r*0.6){const hx=e.x+Math.cos(e.a)*e.r*0.8,hy=e.y+Math.sin(e.a)*e.r*0.8;rotBite=Math.hypot(hx-P.x,hy-P.y)<pR+e.r*0.4;}
   if(s.dmg&&(s.sting||(s.beh==='hunt'&&e.tg==='P')||rotBite||(tierOf(e)>D.pl&&e.aggro>0))){deathCause='атака: '+s.ru.toLowerCase();hurt(s.dmg*dt*(tierOf(e)>D.pl?1:0.3),cw);}
+  if(e.sp==='stentor'&&P.suckT>0)continue;
   // расталкивание
   const nx=(e.x-cw.wx)/(cd||1),ny=(e.y-cw.wy)/(cd||1);const mP=D.n,mE=(e.r/10)**2;const tot=mP+mE;
   const push=Math.min(ov,6);if(s.beh!=='vort'){e.x+=nx*push*(mP/tot);e.y+=ny*push*(mP/tot);}if(s.beh!=='sessile'){}P.x-=nx*push*(mE/tot);P.y-=ny*push*(mE/tot);
@@ -1082,7 +1084,6 @@ function drawWorld(){
    else if(e.sp==='amoeba'){for(const sg of[-1,1]){ctx.save();ctx.translate(0,sg*e.r*0.75*p);ctx.scale(1-0.28*p,1-0.28*p);f(e,T);ctx.restore();}}
    else{for(const sg of[-1,1]){ctx.save();ctx.translate(sg*e.r*0.5*p,0);ctx.scale(1-0.4*p,1);f(e,T);ctx.restore();}}}
   else f(e,T);
-  if(e.sp==='stentor'&&!e.eaten)drawVortex(e,T);
   if(e.conj&&e.conj.lead){const r=e.r;ctx.strokeStyle=ST.nucRim(0.8);ctx.lineWidth=PX*1.2;ctx.beginPath();for(let k=-3;k<=3;k++){const x=k*r*0.07;ctx.moveTo(x,r*0.22);ctx.lineTo(x+Math.sin(T*6+k)*r*0.02,r*0.44);}ctx.stroke();ctx.fillStyle=ST.nuc(1.6);circ(Math.sin(T*1.5)*r*0.12,r*0.33,r*0.04);ctx.fill();}
   if(e.bond>0){ctx.strokeStyle='rgba(255,210,90,0.9)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(0,0,e.r*1.25,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,e.bond/3));ctx.stroke();}
   if(e.infested){ctx.strokeStyle=`rgba(190,80,230,${0.5+0.3*Math.sin(T*4)})`;ctx.lineWidth=2*PX;ctx.setLineDash([2*PX,4*PX]);circ(0,0,e.r*1.08);ctx.stroke();ctx.setLineDash([]);}
@@ -1106,8 +1107,6 @@ function drawWorld(){
 }
 function drawOverlay(){
  ctx.setTransform(DPR,0,0,DPR,0,0);
- if(P.suckT>0){const k=clamp(P.suckK||0,0,1),sx=(P.suckX-cam.x)*cam.s+W/2,sy=(P.suckY-cam.y)*cam.s+H/2;const g=ctx.createRadialGradient(sx,sy,Math.min(W,H)*0.08,sx,sy,Math.max(W,H)*0.8);g.addColorStop(0,`rgba(10,15,30,${0.35*k})`);g.addColorStop(0.35,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(40,5,15,${0.45*k+0.1*Math.sin(T*10)*k})`);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.translate(sx,sy);ctx.strokeStyle=`rgba(255,255,255,${0.12*k})`;ctx.lineWidth=2;for(let a=0;a<10;a++){const an=a/10*TAU-T*3;ctx.beginPath();ctx.arc(0,0,Math.min(W,H)*(0.25+0.05*Math.sin(T*4+a)),an,an+0.5);ctx.stroke();}ctx.restore();}
  if(DAYK<0.995){ctx.fillStyle=`rgba(4,8,32,${(1-DAYK)*(ST.dark?0.32:0.45)})`;ctx.fillRect(0,0,W,H);
   if(DAYK<0.7){ctx.save();ctx.globalCompositeOperation='lighter';const nk=(0.7-DAYK)/0.58;for(const e of ents){if(e.eaten||e.dead)continue;let gr=0,col='';if(e.sp==='noct'){gr=e.r*2.6;col='90,200,255';}else if(e.sp==='bell'){gr=e.r*1.6;col='160,120,255';}else if(e.sp==='plasmid'){gr=e.r*5;col='255,210,90';}if(!gr)continue;const sx=(e.x-cam.x)*cam.s+W/2,sy=(e.y-cam.y)*cam.s+H/2,R0=gr*cam.s;if(sx<-R0||sx>W+R0||sy<-R0||sy>H+R0)continue;const a=nk*(0.3+0.2*Math.sin(T*3+e.seed*9))*(e.sp==='noct'&&Math.hypot(e.vx||0,e.vy||0)>3?1.6:1);const g=ctx.createRadialGradient(sx,sy,0,sx,sy,R0);g.addColorStop(0,`rgba(${col},${a})`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.fillRect(sx-R0,sy-R0,R0*2,R0*2);}ctx.restore();}}
  if(FX.vig){const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.hypot(W,H)*0.55);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,ST.vig);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}

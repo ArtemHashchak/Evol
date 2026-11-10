@@ -52,6 +52,17 @@ const SPEC=Object.assign({
 const ZW={ostracod:{lagoon:4,shelf:5,reef:3,slope:3,deep:2,currents:3,seeps:1},trilobite:{lagoon:2,shelf:4,reef:4,slope:4,deep:1.5,currents:1,seeps:1},hallucigenia:{lagoon:1,shelf:2,reef:3,slope:2,deep:0.5,currents:1},polychaete:{lagoon:1,shelf:2,reef:2,slope:2,deep:3,seeps:2},pikaia:{lagoon:1,shelf:3,reef:2,slope:3,deep:1,currents:2},opabinia:{lagoon:0.2,shelf:2,reef:2,slope:2,deep:1.5,currents:1.5,seeps:1},anomalocaris:{shelf:1,reef:1.5,slope:1.5,deep:1.5,currents:2,seeps:1},reaper:{shelf:0.5,reef:0.5,slope:1,deep:1.8,seeps:2},jelly:{lagoon:1,shelf:2,reef:1.5,slope:2,deep:1.5,currents:3,seeps:0.5},ctenophore:{lagoon:0.5,shelf:1.5,reef:1,slope:1.5,deep:2,currents:2,seeps:1.5},glass:{slope:0.6,deep:2.2,seeps:2},priapulid:{lagoon:0.5,shelf:1,reef:1,slope:2,deep:2,seeps:2}};
 for(const k in ZW)SPEC[k].zones=ZW[k];
 for(const k in SPEC){const S=SPEC[k];S.id=k;S.baseL=bodyStats(S.body(),{}).L;}
+/* ===== пищевая цепь: уровень существа задаёт его здоровье, урон и награду ===== */
+const TIERS={ostracod:1,marrella:1,slug:1,pikaia:2,polychaete:2,hallucigenia:2,sulfur:2,haikou:2,trilobite:3,wiwaxia:3,vetulicola:3,priapulid:3,ctenophore:3,opabinia:4,jelly:4,reaper:5,glass:5,anomalocaris:6};
+const TT=[{hp:4,dmg:1,food:1,dna:0.2},{hp:8,dmg:2,food:2.5,dna:0.55},{hp:20,dmg:4,food:5,dna:0.85},{hp:45,dmg:7,food:9,dna:1.25},{hp:85,dmg:11,food:14,dna:1.7},{hp:150,dmg:16,food:20,dna:2.3},{hp:260,dmg:23,food:28,dna:3}];
+for(const k in SPEC)SPEC[k].tier=TIERS[k]||1;
+const TIER_RU=['','уровень 1 — мелочь','уровень 2','уровень 3','уровень 4','уровень 5','уровень 6 — высший хищник'];
+/* ===== логова боссов ===== */
+const BOSSES={
+ reefQueen:{ru:'Королева рифа',sp:'anomalocaris',x:-3700,zone:'reef',need:4,hp:750,dmg:20,sc:2.4,hue:330,reward:'crown',food:90},
+ bigJelly:{ru:'Великая медуза',sp:'jelly',x:6650,zone:'currents',need:4,hp:650,dmg:14,sc:5,hue:280,reward:'nettle',food:70,float:1},
+ giantOpa:{ru:'Исполинская опабиния',sp:'opabinia',x:3900,zone:'deep',need:5,hp:1000,dmg:26,sc:4.2,hue:20,reward:'lure',food:110},
+ oldReaper:{ru:'Древний жнец',sp:'reaper',x:9800,zone:'seeps',need:6,hp:1500,dmg:32,sc:3.6,hue:300,reward:'seepheart',food:150}};
 const ents=[],foods=[],nests=[],carr=[];let spawnInView=false;
 let entId=1;
 function spawnEnt(sp,x,y,sc,o){
@@ -60,29 +71,30 @@ function spawnEnt(sp,x,y,sc,o){
  const st=bodyStats(b,o.un||{});const fz=floorH(x,y);let z;
  if(S.beh==='graze'||S.beh==='ambush'||S.beh==='kin'||S.beh==='pack')z=fz+st.Req*0.6;
  else if(S.beh==='drift')z=fz+rnd(25,Math.max(30,SURF-fz-20));else z=fz+rnd(6,Math.min(120,Math.max(8,SURF-fz-10)));
- const e={id:entId++,sp,S,b,st,x,y,z:Math.min(z,SURF-4),a:R_()*TAU,hp:st.hpMax,t:R_()*10,state:'idle',tgt:null,cd:0,scan:R_()*0.4,curl:0,mv:0,dmgT:0,hid:S.beh==='ambush',full:0,wx:x,wy:y,wz:z,gone:false};
+ const tier=S.kin?0:S.tier;const hp0=S.kin?st.hpMax:TT[tier].hp*rnd(0.85,1.2);
+ const e={id:entId++,sp,S,b,st,tier,hpMax:hp0,x,y,z:Math.min(z,SURF-4),a:R_()*TAU,hp:hp0,t:R_()*10,state:'idle',tgt:null,cd:0,scan:R_()*0.4,curl:0,mv:0,dmgT:0,hid:S.beh==='ambush',full:0,wx:x,wy:y,wz:z,gone:false};
  e.pos=initChain(b,e.x,e.y,e.z,e.a);ents.push(e);return e;
 }
-function entVal(e){return e.st.M*1.1*(e.S.valK||1)+0.5;}
+function entVal(e){return e.boss?e.B.food:TT[e.tier||1].food*(e.S.valK||1);}
 function angD(a,b){let d=a-b;while(d>Math.PI)d-=TAU;while(d<-Math.PI)d+=TAU;return d;}
 function d3(a,b){return Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);}
 function headR(e){return e.b.segs[0].r;}
 /* ===== еда ===== */
-function addPlankton(x,y,z){foods.push({k:'pl',x,y,z,val:0.35,ph:R_()*TAU,hue:R_()<0.5?100:60});}
+function addPlankton(x,y,z){foods.push({k:'pl',x,y,z,val:0.25,ph:R_()*TAU,hue:R_()<0.5?100:60});}
 function addCarrion(x,y,z,val,r,sp){carr.push({x,y,z,val,val0:val,r,t:0,sp,seed:R_()});}
 /* ===== поведение ===== */
 function canSee(e,tg,range){if(tg===P){if(!P.alive||P.bur)return false;const dark=clamp(1-P.z/SURF,0,1);range*=1-0.4*dark;if(zoneAt(P.x)==='reef'&&P.z-floorH(P.x)<30)range*=0.5;}else if(tg.hid)return false;return Math.hypot(tg.x-e.x,tg.y-e.y)<range&&Math.abs(tg.z-e.z)<range*0.7;}
 function threatTo(e){
  let best=null,bd=1e9;const R=e.st.L*4+50;
- if(P.alive&&!P.bur&&P.st.Req>e.st.Req*1.15&&!e.S.kin){const d=d3(e,P);if(d<R&&d<bd){bd=d;best=P;}}
- for(const o of ents){if(o===e||o.S.beh!=='hunt'||o.full>0||o.st.Req<e.st.Req*1.2)continue;const d=d3(e,o);if(d<R&&d<bd){bd=d;best=o;}}
+ if(P.alive&&!P.bur&&P.pt>0&&P.pt>=e.tier&&!e.S.kin){const d=d3(e,P);if(d<R&&d<bd){bd=d;best=P;}}
+ for(const o of ents){if(o===e||o.S.beh!=='hunt'||o.full>0||o.tier<=e.tier)continue;const d=d3(e,o);if(d<R&&d<bd){bd=d;best=o;}}
  return best;
 }
 function preyFor(e){
  let best=null,bd=1e9;const R=e.st.L*(e.st.eyeQ>0.2?5:3)+60;
- if(P.alive&&P.st.Req<e.st.Req*0.95&&canSee(e,P,R)){const d=d3(e,P)*0.85;if(d<bd){bd=d;best=P;}}
- for(const o of ents){if(o===e||o.sp===e.sp||o.hid||o.st.Req>e.st.Req*0.8||o.S.beh==='drift')continue;const d=d3(e,o);if(d<R&&d<bd){bd=d;best=o;}}
- for(const n of nests){if(n.care||!n.eggs)continue;const d=Math.hypot(n.x-e.x,n.y-e.y);if(d<R*0.6&&d<bd&&e.st.Req<P.st.Req*3){bd=d;best=n;}}
+ if(P.alive&&e.tier>P.pt&&canSee(e,P,R)){const d=d3(e,P)*0.85;if(d<bd){bd=d;best=P;}}
+ for(const o of ents){if(o===e||o.sp===e.sp||o.hid||o.boss||(o.tier||0)>=e.tier||o.S.beh==='drift')continue;const d=d3(e,o);if(d<R&&d<bd){bd=d;best=o;}}
+ for(const n of nests){if(n.care||!n.eggs)continue;const d=Math.hypot(n.x-e.x,n.y-e.y);if(d<R*0.6&&d<bd){bd=d;best=n;}}
  return best;
 }
 function steer(e,dt,tx,ty,tz,spd){
@@ -109,24 +121,32 @@ function entUpdate(e,dt){
    if(S.scav){let bc=null,bd=st.L*6+50;for(const c of carr){const d=Math.hypot(c.x-e.x,c.y-e.y);if(d<bd){bd=d;bc=c;}}if(bc){tx=bc.x;ty=bc.y;tz=floorZ;spd=cspd*0.6;if(bd<st.L*0.6+bc.r){bc.val-=dt*st.M*0.4;}}}}
   if(crawler)tz=floorZ;
  }else if(S.beh==='hunt'){
-  if(e.scan<=0&&e.full<=0){e.scan=0.35+R_()*0.2;const p=preyFor(e);if(p&&(!e.tgt||e.state!=='chase'))e.chase=0;e.tgt=p;}
+  const dmg=e.boss?e.B.dmg:TT[e.tier].dmg;
+  if(e.boss){// босс держится у логова и нападает на всех, кто подплыл
+   const home=Math.abs(e.x-e.B.x)>230;const pNear=P.alive&&!P.bur&&Math.abs(P.x-e.B.x)<260;
+   e.tgt=pNear&&!home?P:null;if(home||!e.tgt){tx=e.B.x+Math.sin(e.t*0.3)*90;tz=floorH(tx)+40+20*Math.sin(e.t*0.5);spd=st.speed*0.35;e.state='idle';}
+   if(pNear&&!e.seen){e.seen=1;toast(`<b>${e.B.ru}</b> охраняет логово! Нужна сила хищника ${e.B.need}, иначе твои укусы почти не ранят.`);}}
+  else if(P.alive&&P.pt>0&&e.tier<=P.pt&&d3(e,P)<st.L*4+60){// слабый хищник боится игрока
+   const dx=e.x-P.x||1;tx=e.x+Math.sign(dx)*80;tz=clamp(e.z+(e.z-P.z),floorH(e.x)+5,SURF-6);spd=st.speed;e.state='flee';if(e.tgt===P)e.tgt=null;}
+  if(!e.boss&&e.state!=='flee'&&e.scan<=0&&e.full<=0){e.scan=0.35+R_()*0.2;const p=preyFor(e);if(p&&(!e.tgt||e.state!=='chase'))e.chase=0;e.tgt=p;}
   const tg=e.tgt;
-  if(tg&&e.full<=0&&!(tg.gone)&&(tg!==P||(P.alive&&!P.bur))&&!(tg.eggs===0)){
-   e.state='chase';e.chase=(e.chase||0)+dt;tx=tg.x;ty=tg.y;tz=tg.z!=null?tg.z:floorH(tg.x,tg.y);spd=st.speed*(e.chase<6?1:0.6);
-   const hp=e.pos[0],reach=headR(e)*1.3+st.reach+(tg.st?tg.st.Req*0.8:2)+1.5;const dd=Math.hypot(tg.x-hp.x,tg.y-hp.y,(tz)-hp.z);
-   if(dd<reach&&e.cd<=0){e.cd=0.9;
-    if(tg===P)hurtPlayer(st.bite*1.1*(P.st.Req<=st.Req*st.swallow?2.2:1),e);
-    else if(tg.eggs!=null){tg.eggs=Math.max(0,tg.eggs-1);if(tg===P.lastNest||tg.own)toast('Хищник разоряет твою кладку!');e.full=6;}
-    else{tg.hp-=st.bite*(tg.curl>0?0.3:1)*(tg.st.armor||1);tg.dmgT=2;if(tg.st.spine)e.hp-=tg.st.spine;if(tg.hp<=0||tg.st.Req<=st.Req*st.swallow){killEnt(tg,null,tg.st.Req<=st.Req*st.swallow);e.full=12+R_()*10;e.tgt=null;}else if(tg.S.curl)tg.curl=3;}}
-   if(e.chase>14){e.tgt=null;e.full=4;}
-  }else{e.state='idle';spd=st.speed*0.3;}
+  if(e.state==='flee'){}
+  else if(tg&&e.full<=0&&!(tg.gone)&&(tg!==P||(P.alive&&!P.bur))&&!(tg.eggs===0)){
+   e.state='chase';e.chase=(e.chase||0)+dt;tx=tg.x;ty=tg.y;tz=tg.z!=null?tg.z:floorH(tg.x);spd=st.speed*(e.chase<6||e.boss?1:0.6);
+   const hp=e.pos[0],reach=headR(e)*1.3+st.reach+(tg.st?tg.st.Req*0.8:2)+1.5;const dd=Math.hypot(tg.x-hp.x,(tz)-hp.z);
+   if(dd<reach&&e.cd<=0){e.cd=e.boss?1.1:0.9;
+    if(tg===P)hurtPlayer(dmg,e);
+    else if(tg.eggs!=null){tg.eggs=Math.max(0,tg.eggs-1);if(tg.own)toast('Хищник разоряет твою кладку!');e.full=6;}
+    else{tg.hp-=dmg*(tg.curl>0?0.3:1)*(tg.st.armor||1);tg.dmgT=2;if(tg.st.spine)e.hp-=tg.st.spine;const sw=(tg.tier||0)<=e.tier-2;if(tg.hp<=0||sw){killEnt(tg,null,sw);e.full=12+R_()*10;e.tgt=null;}else if(tg.S.curl)tg.curl=3;}}
+   if(!e.boss&&e.chase>14){e.tgt=null;e.full=4;}
+  }else if(!e.boss){e.state='idle';spd=st.speed*0.3;}
  }else if(S.beh==='drift'){
-  spd=st.speed*0.25*(0.4+0.6*Math.max(0,Math.sin(e.t*2.5)));
+  spd=st.speed*0.25*(0.4+0.6*Math.max(0,Math.sin(e.t*2.5)));if(e.boss){tx=e.B.x+Math.sin(e.t*0.2)*120;tz=SURF*0.72+Math.sin(e.t*0.4)*40;spd=st.speed*0.3;}
   if(S.eatsSmall){for(const f of foods){if(Math.abs(f.x-e.x)<st.Req*2&&Math.abs(f.y-e.y)<st.Req*2){f.dead=1;}}}
  }else if(S.beh==='ambush'){
   tz=fz-st.Req*0.2;spd=0;
-  if(e.hid){if(P.alive&&!P.bur&&d3(e,P)<st.L*1.6+P.st.Req&&P.st.Req<st.Req*2.2){e.hid=false;e.state='strike';e.cd=0;e.stt=1.2;}}
-  else{e.stt-=dt;if(e.state==='strike'&&e.cd<=0&&P.alive&&d3(e,P)<st.L*1.4+P.st.Req*1.2){e.cd=1;hurtPlayer(st.bite*1.3,e);}if(e.stt<=0){e.hid=true;e.state='idle';}}
+  if(e.hid){if(P.alive&&!P.bur&&d3(e,P)<st.L*1.6+P.st.Req&&e.tier>P.pt){e.hid=false;e.state='strike';e.cd=0;e.stt=1.2;}}
+  else{e.stt-=dt;if(e.state==='strike'&&e.cd<=0&&P.alive&&d3(e,P)<st.L*1.4+P.st.Req*1.2){e.cd=1;hurtPlayer(TT[e.tier].dmg*1.2,e);}if(e.stt<=0){e.hid=true;e.state='idle';}}
   e.z=fz;e.pos.forEach((p,i)=>{p.x=e.x;p.y=e.y;p.z=fz+(e.hid?0:st.L*0.15*(i))});e.mv=0;return;
  }else if(S.beh==='kin'){
   const d=Math.hypot(P.x-e.x,P.y-e.y);if(e.mate&&P.alive&&d<P.st.L*10&&d>P.st.L*1.5){tx=P.x;ty=P.y;spd=cspd*0.5;}tz=floorZ;
@@ -134,9 +154,9 @@ function entUpdate(e,dt){
  }else if(S.beh==='pack'){
   const k=ents.filter(o=>o.S.beh==='pack').indexOf(e);const off=P.st.L*(1.3+0.6*(k%3));
   tx=P.x-Math.cos(P.a)*off;ty=0;tz=clamp(P.z-Math.sin(P.a)*off+((k%3)-1)*P.st.L*0.7,floorH(tx)+st.Req,SURF-4);const d=Math.hypot(tx-e.x,tz-e.z);spd=Math.min(st.speed*1.15,d*1.5+2);
-  if(e.scan<=0){e.scan=0.4;e.tgt=null;let bd=P.st.L*4+40;for(const o of ents){if(o.S.kin||o.hid||o.gone)continue;let ok=false;if(P.st.brain>=3&&o.S.beh==='hunt'&&o.tgt===P&&o.st.Req<st.Req*2.5)ok=true;else if(o.st.Req<st.Req*0.8&&o.S.beh!=='drift')ok=true;if(!ok)continue;const dd=d3(o,e);if(dd<bd){bd=dd;e.tgt=o;}}}
-  if(e.tgt&&!e.tgt.gone){const tg=e.tgt;tx=tg.x;ty=tg.y;tz=tg.z;spd=st.speed;const dd=d3(e.pos[0],tg);if(dd<headR(e)*1.3+tg.st.Req*0.8+1.5&&e.cd<=0){e.cd=0.8;tg.hp-=st.bite*(tg.st.armor||1);tg.dmgT=2;if(tg.hp<=0||tg.st.Req<=st.Req*st.swallow){const v=entVal(tg);killEnt(tg,null,true);gainFood(v*0.35,null,true);}}}
-  if(e.hp<e.st.hpMax)e.hp=Math.min(e.st.hpMax,e.hp+dt*0.5);
+  if(e.scan<=0){e.scan=0.4;e.tgt=null;let bd=P.st.L*4+40;for(const o of ents){if(o.S.kin||o.hid||o.gone)continue;if(o.boss)continue;let ok=false;if(P.st.brain>=3&&o.S.beh==='hunt'&&o.tgt===P&&o.tier<=P.pt)ok=true;else if(o.tier<P.pt&&o.S.beh!=='drift')ok=true;if(!ok)continue;const dd=d3(o,e);if(dd<bd){bd=dd;e.tgt=o;}}}
+  if(e.tgt&&!e.tgt.gone){const tg=e.tgt;tx=tg.x;ty=tg.y;tz=tg.z;spd=st.speed;const dd=d3(e.pos[0],tg);if(dd<headR(e)*1.3+tg.st.Req*0.8+1.5&&e.cd<=0){e.cd=0.8;tg.hp-=P.bite*0.5*(tg.st.armor||1);tg.dmgT=2;if(tg.hp<=0){const v=entVal(tg);killEnt(tg,null,true);gainFood(v*0.35,null,true);}}}
+  if(e.hp<e.hpMax)e.hp=Math.min(e.hpMax,e.hp+dt*0.5);
  }
  steer(e,dt,tx,ty,tz,spd);
  const cu=curAt(e.x,e.z);if(cu&&!(crawler&&e.z-fz<st.Req*2))e.x+=cu*dt*(S.beh==='drift'?1:0.55);
@@ -144,18 +164,21 @@ function entUpdate(e,dt){
  e.x=clamp(e.x,-HALF*0.95,HALF*0.95);e.y=clamp(e.y,-HALF*0.95,HALF*0.95);
  if(e.b.sym!=='radial'&&(e.b.skel==='none'||e.b.skel==='notochord')&&e.mv>0.05){const w=Math.sin(e.t*8)*headR(e)*0.25*e.mv;updateChain(e.b,e.pos,e.x-Math.sin(e.a)*w,e.y+Math.cos(e.a)*w,e.z);}else updateChain(e.b,e.pos,e.x,e.y,e.z);
  // жжение
- if(S.sting&&P.alive&&!P.bur){const r=st.Req*(S.custom?1.4:2.2)+P.st.Req*0.8;if(d3(e,P)<r||(e.b.sym==='radial'&&Math.hypot(e.x-P.x,e.y-P.y)<r*0.8&&P.z<e.z&&P.z>e.z-st.Req*4)){if(e.cd<=0){e.cd=0.7;hurtPlayer(S.sting*(1.5+st.Req*0.9),e,true);}}}
+ if(S.sting&&P.alive&&!P.bur){const r=st.Req*(S.custom?1.4:2.2)+P.st.Req*0.8;if(d3(e,P)<r||(e.b.sym==='radial'&&Math.hypot(e.x-P.x,e.y-P.y)<r*0.8&&P.z<e.z&&P.z>e.z-st.Req*4)){if(e.cd<=0){e.cd=0.7;hurtPlayer((e.boss?e.B.dmg:TT[e.tier].dmg*0.5)*(e.boss||e.tier>P.pt?1:0.3),e,true);}}}
  if(e.hp<=0)killEnt(e,null,false);
 }
-function killEnt(e,by,eaten){if(e.gone)return;e.gone=true;if(e.S.beh==='pack')toast('Член стаи погиб');if(!eaten&&!e.S.kin)addCarrion(e.x,e.y,e.z,entVal(e),e.st.Req,e.sp);}
+function bossTick(){const vr=viewR();for(const id in BOSSES){const B=BOSSES[id];if(P.bosses&&P.bosses[id])continue;let e=ents.find(q=>q.boss===id&&!q.gone);const near=Math.abs(P.x-B.x)<vr*2.2+300;
+ if(!e&&near){e=spawnEnt(B.sp,B.x,0,B.sc);e.boss=id;e.B=B;e.tier=7;e.hp=e.hpMax=B.hp;e.b.hue=B.hue;e.z=B.float?SURF*0.72:floorH(B.x)+40;e.pos=initChain(e.b,e.x,0,e.z,e.a);}
+ else if(e&&!near&&Math.abs(P.x-B.x)>vr*3+600)e.gone=true;}}
+function killEnt(e,by,eaten){if(e.gone)return;e.gone=true;if(e.boss&&P.bosses&&!P.bosses[e.boss])bossDefeated(e);if(e.S.beh==='pack')toast('Член стаи погиб');if(!eaten&&!e.S.kin)addCarrion(e.x,e.y,e.z,entVal(e),e.st.Req,e.sp);}
 /* ===== спавн вокруг игрока ===== */
 function viewR(){return Math.hypot(W,H)/cam.s*0.55;}
 function pickSpecies(zone){let tot=0;for(const k in SPEC)tot+=SPEC[k].zones[zone]||0;let r=R_()*tot;for(const k in SPEC){r-=SPEC[k].zones[zone]||0;if(r<=0)return k;}return 'ostracod';}
 function sizeFor(S){const PL=P.st.L;return clamp(PL*rnd(S.rel[0],S.rel[1])/S.baseL,S.sc[0],S.sc[1]);}
 function popTick(dt){
  const vr=viewR(),ACT=Math.max(220,vr*1.35);
- for(let i=ents.length-1;i>=0;i--){const e=ents[i];if(e.gone){ents.splice(i,1);continue;}if(e.S.beh!=='pack'&&Math.hypot(e.x-P.x,e.y-P.y)>ACT*1.7){ents.splice(i,1);}}
- const want=80+Math.min(30,P.st.L*0.4);let n=ents.filter(e=>!e.S.kin).length;let guard=0;
+ for(let i=ents.length-1;i>=0;i--){const e=ents[i];if(e.gone){ents.splice(i,1);continue;}if(e.S.beh!=='pack'&&!e.boss&&Math.hypot(e.x-P.x,e.y-P.y)>ACT*1.7){ents.splice(i,1);}}
+ const want=80+Math.min(30,P.st.L*0.4);bossTick();let n=ents.filter(e=>!e.S.kin&&!e.boss).length;let guard=0;
  while(n<want&&guard++<(spawnInView?40:6)){
   const a=R_()*TAU,d=spawnInView?rnd(0,ACT):rnd(vr*1.02,ACT);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;
   let sp=pickSpecies(zoneAt(x,y));if(SPEC[sp].beh==='hunt'){let tries=0;while(SPEC[sp].beh==='hunt'&&tries++<8)sp=pickSpecies(zoneAt(x,y));if(SPEC[sp].beh==='hunt')continue;}const S=SPEC[sp];
@@ -163,7 +186,7 @@ function popTick(dt){
   else{spawnEnt(sp,x,y,sizeFor(S));n++;}
  }
  // хищники распределены равномерно: в любой зоне рядом держится примерно одинаковое их число
- const pz=zoneAt(P.x);const hunters=ents.filter(e=>e.S.beh==='hunt'&&!e.gone).length,wantH=pz==='lagoon'?1:4+Math.min(4,Math.floor(P.st.L/15))+(pz==='deep'||pz==='seeps'?1:0);
+ const pz=zoneAt(P.x);const hunters=ents.filter(e=>e.S.beh==='hunt'&&!e.gone&&!e.boss).length,wantH=pz==='lagoon'?1:4+Math.min(4,Math.floor(P.st.L/15))+(pz==='deep'||pz==='seeps'?1:0);
  if(hunters<wantH&&R_()<dt*1.2){const sd=R_()<0.5?-1:1,d=rnd(vr*1.05,ACT);const x=clamp(P.x+sd*d,-HALF*0.9,HALF*0.9);const zn=zoneAt(x);const hs=Object.keys(SPEC).filter(k=>SPEC[k].beh==='hunt');let tot=0;for(const k of hs)tot+=SPEC[k].zones[zn]||0;let r=R_()*tot,sp=hs[0];for(const k of hs){r-=SPEC[k].zones[zn]||0;if(r<=0){sp=k;break;}}spawnEnt(sp,x,0,sizeFor(SPEC[sp]));}
  // сородичи
  const kin=ents.filter(e=>e.sp==='kin');if(kin.length<3&&R_()<dt*0.5){const a=R_()*TAU,d=rnd(vr*1.05,vr*1.6);const x=clamp(P.x+(Math.cos(a)<0?-1:1)*d,-HALF*0.9,HALF*0.9),y=0;if(ZONES[zoneAt(x)].nest){const b=cloneBody(P.body);scaleBody(b,rnd(0.85,1.05));const e=spawnEnt('kin',x,y,1,{body:b,un:P.un});e.mate=true;}}
@@ -190,7 +213,8 @@ function drawEnt(e){
  else drawBody(e.b,e.pos,{moving:e.mv,heading:e.a,brain:e.S.kin?P.st.brain:0});
  if(S.glow){ctx.save();ctx.globalCompositeOperation='lighter';for(let i=0;i<e.pos.length;i++){const q=proj(e.pos[i].x,0,e.pos[i].z);const a=0.25+0.2*Math.sin(e.t*3+i);ctx.fillStyle=`rgba(140,255,210,${a})`;ctx.beginPath();ctx.arc(q[0],q[1],Math.max(1.5,e.b.segs[i].r*s*0.35),0,TAU);ctx.fill();}ctx.restore();}
  if(e.S.kin){const p=proj(e.pos[0].x,e.pos[0].y,e.pos[0].z);const r=st.Req*s;if(e.sp==='kin'&&e.mate){ctx.fillStyle=`rgba(255,120,170,${0.6+0.3*Math.sin(T_*4)})`;heart(p[0],p[1]-r*2.6-6,Math.max(5,r*0.6));}else if(e.sp==='pack'){ctx.strokeStyle='rgba(120,220,255,0.7)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p[0],p[1]-r*2.2-5,3,0,TAU);ctx.stroke();}}
- if(e.dmgT>0&&e.hp>0){const p=proj(e.x,e.y,e.z),r=Math.max(8,st.Req*s*1.6),k=clamp(e.hp/e.st.hpMax,0,1);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.beginPath();ctx.arc(p[0],p[1]-r*0.3,r,Math.PI*0.2,Math.PI*0.8);ctx.stroke();ctx.strokeStyle=`hsla(${k*110},80%,58%,0.9)`;ctx.beginPath();ctx.arc(p[0],p[1]-r*0.3,r,Math.PI*0.8-Math.PI*0.6*k,Math.PI*0.8);ctx.stroke();}
+ if(!e.S.kin&&!e.boss&&!e.hid){const q=proj(e.pos[0].x,0,e.pos[0].z);const ed=e.tier<=P.pt;ctx.fillStyle=ed?'rgba(120,230,140,0.85)':e.tier===P.pt+1?'rgba(255,200,90,0.9)':'rgba(255,90,80,0.9)';ctx.beginPath();ctx.arc(q[0],q[1]-Math.max(6,e.b.segs[0].r*s*1.6),Math.max(1.8,Math.min(3.2,s*0.35)),0,TAU);ctx.fill();}
+ if(e.dmgT>0&&e.hp>0&&!e.boss){const p=proj(e.x,e.y,e.z),r=Math.max(8,st.Req*s*1.6),k=clamp(e.hp/e.hpMax,0,1);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.beginPath();ctx.arc(p[0],p[1]-r*0.3,r,Math.PI*0.2,Math.PI*0.8);ctx.stroke();ctx.strokeStyle=`hsla(${k*110},80%,58%,0.9)`;ctx.beginPath();ctx.arc(p[0],p[1]-r*0.3,r,Math.PI*0.8-Math.PI*0.6*k,Math.PI*0.8);ctx.stroke();}
 }
 function heart(x,y,r){ctx.beginPath();ctx.moveTo(x,y+r*0.6);ctx.bezierCurveTo(x-r*1.2,y-r*0.2,x-r*0.5,y-r*1.1,x,y-r*0.4);ctx.bezierCurveTo(x+r*0.5,y-r*1.1,x+r*1.2,y-r*0.2,x,y+r*0.6);ctx.fill();}
 function drawFood(f){const p=proj(f.x,f.y,f.z);if(p[0]<-10||p[0]>W+10||p[1]<-10||p[1]>H+10)return;const r=Math.max(1.2,0.55*cam.s);ctx.fillStyle=`hsla(${f.hue},60%,70%,0.75)`;ctx.beginPath();ctx.arc(p[0]+Math.sin(T_*2+f.ph)*r*0.5,p[1],r,0,TAU);ctx.fill();ctx.fillStyle='rgba(255,255,255,0.35)';ctx.beginPath();ctx.arc(p[0]+Math.sin(T_*2+f.ph)*r*0.5-r*0.3,p[1]-r*0.3,r*0.35,0,TAU);ctx.fill();}

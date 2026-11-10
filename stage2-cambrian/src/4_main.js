@@ -1,11 +1,14 @@
 /* ===== игрок ===== */
 const SAVE='evo_stage2_v1',META_KEY='evo_stage2_meta';
-function newPlayer(sym,seed){return{sym,seed,body:defaultBody(sym),un:{},st:null,x:0,y:0,z:300,a:0,vx:0,vy:0,vz:0,mv:0,pos:[],hp:1,o2:1,sat:0.85,bm:8,dna:5,dnaF:0,gen:1,off:0,eaten:{},time:0,bur:false,packOn:false,eggCd:0,bcd:0,inv:0,alive:false,zones:{},flags:{},kills:0,eggsLaid:0,hatched:0,lastNest:null,home:null,hit:0,foodCount:0,packN:0,done:false,gut:[],samples:{},dashT:0,dashCd:0};}
+function newPlayer(sym,seed){return{sym,seed,body:defaultBody(sym),un:{},st:null,x:0,y:0,z:300,a:0,vx:0,vy:0,vz:0,mv:0,pos:[],hp:1,o2:1,sat:0.85,bm:14,dna:6,bosses:{},kc:{},pt:0,bite:2,dnaF:0,gen:1,off:0,eaten:{},time:0,bur:false,packOn:false,eggCd:0,bcd:0,inv:0,alive:false,zones:{},flags:{},kills:0,eggsLaid:0,hatched:0,lastNest:null,home:null,hit:0,foodCount:0,packN:0,done:false,gut:[],samples:{},dashT:0,dashCd:0};}
 let P=newPlayer('bilateral',1);P.st=bodyStats(P.body,P.un);
 const GOAL=()=>P.sym==='radial'?24:60;
 function lenMM(){return P.sym==='radial'?P.body.segs[0].r*2:P.st.L;}
 function camScale(){return Math.min(W,H)/(Math.max(P.st.L*(P.sym==='radial'?2.2:1),10)*(touchUI&&Math.min(W,H)<500?6.5:8.5));}
-function refreshStats(){const r=P.st&&P.st.hpMax?P.hp/P.st.hpMax:1;P.st=bodyStats(P.body,P.un);P.hp=clamp(r,0.05,1)*P.st.hpMax;cam.ts=camScale();}
+const BITE=[2,5,9,14,20,28,38];
+function calcPT(){const c=P.st.c;let n=0;for(const t of ATK_PARTS)if(c[t])n++;for(const id of ATK_NODES)if(P.un[id])n++;P.ptRaw=n;P.pt=Math.min(6,n);P.bite=BITE[P.pt]*(1+0.15*Math.max(0,n-6))*(0.8+0.2*Math.sqrt(P.st.Req));}
+function refreshStats(){const r=P.st&&P.st.hpMax?P.hp/P.st.hpMax:1;const pt0=P.pt;P.st=bodyStats(P.body,P.un);P.hp=clamp(r,0.05,1)*P.st.hpMax;calcPT();cam.ts=camScale();
+ if(pt0!=null&&P.pt>pt0&&P.alive){const sp=Object.keys(SPEC).filter(k=>SPEC[k].tier===P.pt).map(k=>SPEC[k].ru);toast(`<b>Сила хищника: ${P.pt}</b>. Теперь по зубам: ${sp.join(', ')}.`);}}
 function findSpawn(){for(let k=0;k<400;k++){const x=rnd(-11000,-9800);if(floorH(x)>SURF*0.88&&floorType(x)!=='rock')return[x,0];}return[-10400,0];}
 function placePlayer(x,y){P.x=x;P.y=y;P.z=floorH(x,y)+P.st.Req*0.7;P.y=0;P.vx=P.vy=P.vz=0;P.pos=initChain(P.body,P.x,0,P.z,P.a);cam.s=cam.ts;cam.x=P.x;cam.z=P.z;camUpdate(P.x,0,P.z,1);}
 /* ===== ввод ===== */
@@ -38,20 +41,25 @@ function setPause(v){paused=v;$('pause').classList.toggle('hidden',!v||!P.alive|
 /* ===== еда и урон ===== */
 const SAMPLE_Z=['lagoon','reef','currents','seeps'];
 function giveSample(z){if(P.samples[z])return;P.samples[z]=1;P.dna+=4;const nodes=NODES.filter(n=>n.zone===z).map(n=>n.ru);toast(`<b>Образец зоны «${ZONES[z].ru}»</b> (+4 ДНК). В древе открылись: ${nodes.join(', ')}.`);save();}
-function gainFood(v,sp,silent){if(sp&&SPEC[sp]&&P.un.stomach)v*=1.4;if(sp&&SPEC[sp]&&SPEC[sp].sample)giveSample(SPEC[sp].sample);P.bm+=v;P.sat=Math.min(1,P.sat+v/(P.st.M*1.4+6));P.dnaF+=v*0.14;P.foodCount++;while(P.dnaF>=1){P.dnaF-=1;P.dna++;}
- if(sp&&SPEC[sp]&&!P.eaten[sp]){P.eaten[sp]=1;P.dna+=3;toast(`Новая добыча: <b>${SPEC[sp].ru}</b> <span class="muted small">(${SPEC[sp].lat})</span> · +3 ДНК<br><span class="small muted">${SPEC[sp].info}</span>`);}}
+function gainFood(v,sp,silent){if(sp&&SPEC[sp]&&P.un.stomach)v*=1.4;if(sp&&SPEC[sp]&&SPEC[sp].sample)giveSample(SPEC[sp].sample);P.bm+=v;P.sat=Math.min(1,P.sat+v/(P.st.M*1.4+6));P.foodCount++;while(P.dnaF>=1){P.dnaF-=1;P.dna++;}
+ if(sp&&SPEC[sp]&&!P.eaten[sp]){P.eaten[sp]=1;P.dna+=2;toast(`Новая добыча: <b>${SPEC[sp].ru}</b> <span class="muted small">(${SPEC[sp].lat}, ур. ${SPEC[sp].tier})</span> · +2 ДНК<br><span class="small muted">${SPEC[sp].info}</span>`);}}
 function hurtPlayer(d,src,sting){if(!P.alive||P.inv>0||P.bur)return;d*=P.st.armor;if(sting&&P.body.skel!=='none')d*=0.6;P.hp-=d;P.hit=0.35;P.lastHit=src&&src.S?src.S.ru:'';
- if(src&&src.hp!=null&&P.st.spine>0&&!sting){src.hp-=P.st.spine;src.dmgT=2;}
+ if(src&&src.hp!=null&&P.st.spine>0&&!sting){src.hp-=P.st.spine*(P.un.crown?2:1)*(1+P.pt*0.3);src.dmgT=2;}
  if(src&&src.S&&src.S.beh==='hunt'&&!P.flags.warnHunt){P.flags.warnHunt=1;toast(`<b>${src.S.ru}</b> охотится на тебя! Убегай, закапывайся или отрасти шипы и панцирь.`);}}
+function rewardKill(e){if(e.boss)return;const k=(P.kc[e.sp]||0)+1;P.kc[e.sp]=k;const dim=Math.max(0.3,1/(1+0.15*(k-1)));P.dnaF+=TT[e.tier].dna*dim;while(P.dnaF>=1){P.dnaF-=1;P.dna++;}}
 function playerBite(e){const st=P.st;
- if(e.st.Req<=st.Req*st.swallow){gainFood(entVal(e),e.sp);killEnt(e,P,true);P.kills++;P.bcd=0.3;return;}
- const dmg=st.bite*(e.curl>0?0.25:1)*(e.st.armor||1)+st.sting;e.hp-=dmg;e.dmgT=2.5;P.bcd=0.65;
- if(e.st.spine>0)hurtPlayer(e.st.spine*0.8,e);
- if(e.S.sting)hurtPlayer(e.S.sting*2,e,true);
- if(e.S.curl&&R_()<0.6)e.curl=3;
- else if(e.S.fight&&e.st.Req>st.Req*0.6&&R_()<e.S.fight){if(e.S.beh==='hunt'){e.tgt=P;e.chase=0;e.full=0;}else if(e.cd<=0){e.cd=1;hurtPlayer(e.st.bite*0.6,e);}}
+ if(e.boss){const ok=P.pt>=e.B.need;e.hp-=P.bite*(ok?1:0.1);e.dmgT=3;P.bcd=0.6;if(!ok&&!P.flags['bw'+e.boss]){P.flags['bw'+e.boss]=1;toast(`Укусы почти не ранят: для боя с «${e.B.ru}» нужна сила хищника ${e.B.need}.`);}if(e.hp<=0){gainFood(e.B.food,null);killEnt(e,P,false);P.kills++;}return;}
+ if(e.tier>P.pt){e.hp-=P.bite*0.1;e.dmgT=2;P.bcd=0.7;if(!P.flags['tw'+e.tier]){P.flags['tw'+e.tier]=1;toast(P.pt===0?'Без атакующих органов охотиться нельзя: ешь планктон и маты, а в «Эволюции» купи <b>челюсти</b>.':`<b>${e.S.ru}</b> не по зубам: это ${TIER_RU[e.tier]}, а твоя сила хищника — ${P.pt}. Добавь ещё атакующий орган.`);}
+  if(e.cd<=0&&(e.S.fight||e.S.beh==='hunt')){e.cd=1;hurtPlayer(TT[e.tier].dmg,e);}if(e.S.beh==='hunt'){e.tgt=P;e.chase=0;e.full=0;}return;}
+ if(e.tier<=P.pt-2&&e.st.Req<=st.Req*1.2){gainFood(entVal(e),e.sp);rewardKill(e);killEnt(e,P,true);P.kills++;P.bcd=0.3;return;}
+ const dmg=P.bite*(e.curl>0?0.35:1)*(e.st.armor||1);e.hp-=dmg;e.dmgT=2.5;P.bcd=0.65;
+ if(e.st.spine>0)hurtPlayer(TT[e.tier].dmg*0.4,e);
+ if(e.S.sting)hurtPlayer(TT[e.tier].dmg*0.3,e,true);
+ if(e.S.curl&&R_()<0.5)e.curl=2.5;
+ else if(e.S.fight&&e.tier>=P.pt&&R_()<e.S.fight){if(e.S.beh==='hunt'){e.tgt=P;e.chase=0;e.full=0;}else if(e.cd<=0){e.cd=1;hurtPlayer(TT[e.tier].dmg*0.6,e);}}
  else if(e.S.beh!=='drift'){e.thr=P;e.scan=1.5;}
- if(e.hp<=0){killEnt(e,P,false);P.kills++;}}
+ if(e.hp<=0){gainFood(entVal(e),e.sp);rewardKill(e);killEnt(e,P,true);P.kills++;}}
+function bossDefeated(e){const B=e.B;P.bosses[e.boss]=1;P.un[B.reward]=1;P.dna+=15;refreshStats();toast(`<b>${B.ru} повержен(а)!</b> +15 ДНК. Трофей: <b>${NODE[B.reward].ru}</b> — ${NODE[B.reward].desc}`);save();}
 function die(){P.alive=false;P.hp=0;for(const e of ents)if(e.S.beh==='pack'){e.gone=true;P.off++;}
  setTimeout(showDeath,900);}
 function showDeath(){
@@ -135,26 +143,28 @@ function playerUpdate(dt){
  // кислород
  const skin=0.75/(1+st.M/60),absorb=o2At(P.z)*(skin+Math.min(1.5,st.gill*0.17));
  const zP=zoneAt(P.x),chemoOn=P.un.chemo&&(zP==='deep'||zP==='seeps');
- const need=(P.bur?0.15:0.28+0.22*P.mv)+0.05*Math.log2(1+st.M/10)-(chemoOn?0.1:0);
+ const need=(P.bur?0.15:0.28+0.22*P.mv)+0.05*Math.log2(1+st.M/10)-(chemoOn?0.1:0);const needK=P.un.seepheart?0.6:1;
  if(chemoOn){P.sat=Math.min(1,P.sat+dt*0.006);P.bm+=dt*0.03;}if(P.un.symb&&lightAt(P.z)>0.8){P.sat=Math.min(1,P.sat+dt*0.006);P.bm+=dt*0.03;}
- P.o2=clamp(P.o2+(absorb-need)*0.12*dt+(P.z>SURF-st.Req*1.5?dt*0.25:0),0,1);if(P.o2<=0){P.hp-=dt*st.hpMax*0.05;P.lastHit='';}
+ P.o2=clamp(P.o2+(absorb-need*needK)*0.12*dt+(P.z>SURF-st.Req*1.5?dt*0.25:0),0,1);if(P.o2<=0){P.hp-=dt*st.hpMax*0.05;P.lastHit='';}
  if(P.o2<0.3&&!P.flags.o2warn){P.flags.o2warn=1;toast(P.st.gill?'Кислород на исходе — поднимись выше, к свету.':'Кислород на исходе! Поднимись к поверхности. Чтобы жить глубже и расти крупнее, отрасти <b>жабры</b>.');}
  // сытость
- P.sat=Math.max(0,P.sat-dt*st.met*(1+0.6*P.mv));if(P.sat<=0){P.hp-=dt*st.hpMax*0.03;P.lastHit='';}
+ P.sat=Math.max(0,P.sat-dt*st.met*1.4*(1+0.6*P.mv));if(P.sat<=0){P.hp-=dt*st.hpMax*0.03;P.lastHit='';}
  if(P.sat>0.3&&P.o2>0.3)P.hp=Math.min(st.hpMax,P.hp+dt*st.hpMax*0.02);
  // еда
  if(!P.bur){const h=P.pos[0],hr=P.body.segs[0].r,fx=Math.cos(P.a),fz2=Math.sin(P.a);const rad=P.sym==='radial';
   const mx=h.x+(rad?0:fx*hr*0.8),my=0,mz=h.z+(rad?-hr*0.6:fz2*hr*0.8);
   const pr=hr*1.2+1.5+(st.c.tentacle?st.Req*0.7:0)+(rad?st.Req*0.8:0)+(P.un.filter?st.Req*1.5+2:0);
-  for(const f of foods){if(f.dead)continue;if(Math.abs(f.x-mx)<pr&&Math.abs(f.y-my)<pr&&Math.abs(f.z-mz)<pr){f.dead=1;gainFood(f.val*(P.un.filter?2:1));}}
+  for(const f of foods){if(f.dead)continue;if(Math.abs(f.x-mx)<pr&&Math.abs(f.y-my)<pr&&Math.abs(f.z-mz)<pr){f.dead=1;gainFood(f.val*(P.un.filter?2:1));P.dnaF+=0.03;}}
   if(P.bcd<=0){
    let best=null,bd=1e9;
    for(const e of ents){if(e.S.kin||e.gone||(e.hid&&e.S.beh==='ambush'))continue;const r=(rad?st.Req*1.5:hr*1.25+st.reach)+e.st.Req*0.9+1;const q=e.pos[0];const dd=Math.min(Math.hypot(e.x-mx,e.y-my,e.z-mz),Math.hypot(q.x-mx,q.y-my,q.z-mz));if(dd<r&&dd<bd){bd=dd;best=e;}}
    if(best)playerBite(best);
    else for(const c of carr){if(Math.hypot(c.x-mx,c.y-my,c.z-mz)<hr*1.3+c.r+1.5){const ch=Math.min(c.val,2+st.bite*1.5+st.M*0.15);c.val-=ch;gainFood(ch*(P.un.scav?1.6:1));P.bcd=0.45;break;}}
   }
-  if(P.z-fz<st.Req*2){const k=gIdx(P.x);if((TY[k]===3||TY[k]===4)&&MAT[k]>0.15){const rr=P.un.radula?2:1;const e=Math.min(MAT[k]-0.1,dt*0.35*rr);MAT[k]-=e;P.bm+=e*1.3;P.sat=Math.min(1,P.sat+e*2.5/(st.M*1.4+6));P.dnaF+=e*0.2;if(TY[k]===4)giveSample('seeps');else if(zP==='lagoon')giveSample('lagoon');}}
+  if(P.z-fz<st.Req*2){const k=gIdx(P.x);if((TY[k]===3||TY[k]===4)&&MAT[k]>0.15){const rr=P.un.radula?2:1;const e=Math.min(MAT[k]-0.1,dt*0.35*rr);MAT[k]-=e;P.bm+=e*1.3;P.sat=Math.min(1,P.sat+e*2.5/(st.M*1.4+6));P.dnaF+=e*0.05;if(TY[k]===4)giveSample('seeps');else if(zP==='lagoon')giveSample('lagoon');}}
  }
+ if(P.un.nettle&&!P.bur){P.nettleT=(P.nettleT||0)-dt;if(P.nettleT<=0){P.nettleT=0.5;const r=st.Req*3+6;for(const e of ents){if(e.gone||e.S.kin||e.boss||e.tier>P.pt+1)continue;if(d3(e,P)<r+e.st.Req){e.hp-=3+P.pt*1.5;e.dmgT=1.5;if(e.hp<=0){gainFood(entVal(e),e.sp);rewardKill(e);killEnt(e,P,true);}}}}}
+ if(P.un.lure)for(const f of foods){const dx=P.x-f.x,dz=P.z-f.z,d=Math.hypot(dx,dz);if(d<60&&d>1){f.x+=dx/d*dt*12;f.z+=dz/d*dt*12;}}
  // зоны
  const zn=zoneAt(P.x,P.y);if(!P.zones[zn]){P.zones[zn]=1;if(Object.keys(P.zones).length>1){P.dna+=2;toast(`Новая зона: <b>${ZONES[zn].ru}</b> (+2 ДНК)<br><span class="small muted">${ZONES[zn].info}</span>`);}}
  if(P.hp<=0)die();
@@ -233,7 +243,7 @@ function renderEditor(keepMsg){
  $('skel').innerHTML=sk;for(const el of $('skel').querySelectorAll('[data-sk]')){el.onmouseenter=()=>edMsg(`<b>${SKELS[el.dataset.sk].ru}</b>: ${SKELS[el.dataset.sk].desc}`);el.onclick=()=>{if(b.skel!==el.dataset.sk)tryEdit(nb=>{nb.skel=el.dataset.sk;});};}
  const hu=$('hue');hu.value=b.hue;hu.oninput=()=>{P.body.hue=+hu.value;};
  // характеристики
- const st=P.st;const rows=[[rad?'Диаметр колокола':'Длина',lenMM().toFixed(1)+' мм / цель '+GOAL()],['Сегментов',n],['Масса',st.M.toFixed(1)],['Здоровье',st.hpMax.toFixed(0)],['Плавание',st.speed.toFixed(1)],['Ходьба по дну',st.crawl?st.crawl.toFixed(1):'—'],['Броня',st.armor<1?'−'+Math.round((1-st.armor)*100)+'% урона':'нет'],['Жабры',st.gill?st.gill.toFixed(1):'нет (дыхание кожей)'],['Зрение в темноте',Math.round(st.eyeQ*100)+'%'],['Укус',st.bite.toFixed(1)],['Глотает добычу до',Math.round(st.swallow*100)+'% своего размера'],['Шипы / яд',(st.spine?st.spine.toFixed(1):'—')+' / '+(st.sting?st.sting.toFixed(1):'—')],['Мозг',['нервные узлы','мозг I','мозг II','мозг III'][st.brain]]];
+ const st=P.st;const rows=[[rad?'Диаметр колокола':'Длина',lenMM().toFixed(1)+' мм / цель '+GOAL()],['Сегментов',n],['Масса',st.M.toFixed(1)],['Здоровье',st.hpMax.toFixed(0)],['Плавание',st.speed.toFixed(1)],['Ходьба по дну',st.crawl?st.crawl.toFixed(1):'—'],['Броня',st.armor<1?'−'+Math.round((1-st.armor)*100)+'% урона':'нет'],['Жабры',st.gill?st.gill.toFixed(1):'нет (дыхание кожей)'],['Зрение в темноте',Math.round(st.eyeQ*100)+'%'],['Сила хищника',P.pt+(P.pt<6?' (ешь существ до уровня '+P.pt+')':' — высший хищник')],['Укус',P.bite.toFixed(1)],['Шипы / яд',(st.spine?st.spine.toFixed(1):'—')+' / '+(st.sting?st.sting.toFixed(1):'—')],['Мозг',['нервные узлы','мозг I','мозг II','мозг III'][st.brain]]];
  $('stats').innerHTML=rows.map(r=>`<div class="stat"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
 }
 function buyNode(id){const n=NODE[id];if(P.un[id])return;if(n.zone&&!P.samples[n.zone]){edMsg(`Нужен образец из зоны «${ZONES[n.zone].ru}». Отправляйся туда и съешь местного обитателя.`);return;}if(!n.req.every(r=>P.un[r])){edMsg('Сначала открой: '+n.req.filter(r=>!P.un[r]).map(r=>NODE[r].ru).join(', '));return;}if(P.dna<n.cost){edMsg(`<span style="color:#ff9a8a">Нужно ${n.cost} ДНК, есть ${P.dna}. ДНК дают новые виды добычи, новые зоны, еда и вылупившиеся потомки.</span>`);return;}
@@ -277,7 +287,7 @@ function finish(p){P.done=true;P.path=p.id;const run={path:p.id,pathRu:p.ru,len:
  <div style="display:flex;gap:8px;margin-top:12px"><button class="on" id="fNew">Новая игра</button><button id="fStay">Плавать дальше</button></div>`;
  $('finalBox').innerHTML=h;$('fNew').onclick=()=>{localStorage.removeItem(SAVE);location.reload();};$('fStay').onclick=()=>{$('final').classList.add('hidden');paused=false;};}
 /* ===== сохранение ===== */
-function save(){if(!P.alive&&!P.done)return;try{const o={};for(const k of['sym','seed','body','un','x','y','z','a','hp','o2','sat','bm','dna','dnaF','gen','off','eaten','time','zones','flags','kills','eggsLaid','hatched','packOn','foodCount','home','done','path','samples'])o[k]=P[k];o.packN=packCount();o.nests=nests.filter(n=>n.own&&n.eggs>0);localStorage.setItem(SAVE,JSON.stringify({v:1,P:o}));}catch(e){}}
+function save(){if(!P.alive&&!P.done)return;try{const o={};for(const k of['sym','seed','body','un','x','y','z','a','hp','o2','sat','bm','dna','dnaF','gen','off','eaten','time','zones','flags','kills','eggsLaid','hatched','packOn','foodCount','home','done','path','samples','bosses','kc','dnaF'])o[k]=P[k];o.packN=packCount();o.nests=nests.filter(n=>n.own&&n.eggs>0);localStorage.setItem(SAVE,JSON.stringify({v:1,P:o}));}catch(e){}}
 function loadSave(){try{const d=JSON.parse(localStorage.getItem(SAVE));return d&&d.v===1?d:null;}catch(e){return null;}}
 /* ===== HUD ===== */
 let hudT=0;
@@ -286,21 +296,23 @@ function hud(dt){hudT-=dt;if(hudT>0)return;hudT=0.12;const st=P.st;
  $('o2Txt').textContent=Math.round(P.o2*100)+'%';$('o2Bar').style.width=P.o2*100+'%';$('o2Bar').style.background=P.o2<0.25?'#ff7a6a':'#6fd0ff';
  $('satBar').style.width=P.sat*100+'%';$('satBar').style.background=P.sat<0.2?'#ff9a6a':'#7fa0ff';
  $('bmTxt').textContent=P.bm.toFixed(1);$('dnaTxt').textContent=P.dna;$('lenTxt').textContent=`${P.sym==='radial'?'⌀':'длина'} ${lenMM().toFixed(1)} / ${GOAL()} мм`;
- $('offTxt').textContent=`Потомков: ${P.off}`;$('packTxt').textContent=packMax()?`Стая: ${packCount()}/${packMax()}`:'';
+ $('offTxt').innerHTML=`Потомков: ${P.off} · <span style="color:#ff9a7a" title="Сила хищника: ешь существ этого уровня и ниже. Зелёная точка над существом — можно съесть, жёлтая — следующий уровень, красная — опасно.">Хищник: <b>${P.pt}</b></span>`;$('packTxt').textContent=packMax()?`Стая: ${packCount()}/${packMax()}`:'';
  $('bEgg').classList.toggle('hidden',!ents.some(e=>e.sp==='kin'&&e.mate)&&!P.eggsLaid);$('bBur').classList.toggle('hidden',!P.un.burrow);$('bBur').classList.toggle('on',P.bur);
  $('bPack').classList.toggle('hidden',!packMax());$('bPack').classList.toggle('on',P.packOn);$('bPack').textContent=`Стая: ${P.packOn?'вкл':'выкл'}`;
  $('bFinal').classList.toggle('hidden',lenMM()<GOAL()||P.done);$('bDash').classList.toggle('hidden',!P.un.dash);$('bDash').classList.toggle('on',P.dashCd<=0);
  for(const[m,bn]of[['mDash','bDash'],['mEgg','bEgg'],['mBur','bBur'],['mPack','bPack'],['mFinal','bFinal']]){$(m).classList.toggle('hidden',$(bn).classList.contains('hidden'));$(m).classList.toggle('on',$(bn).classList.contains('on'));}
  const zn=zoneAt(P.x,P.y),dep=Math.max(0,(SURF-P.z)/10).toFixed(0);$('info').innerHTML=`<b>${ZONES[zn].ru}</b> · глубина ${dep} м · ${floorTypeRu()}${P.bur?' · <b>закопан</b>':''}`;
- const ns=SAMPLE_Z.filter(z=>P.samples[z]).length;const G=[[P.foodCount>=5,'Поешь: планктон, мелкие рачки, водорослевые маты'],[P.flags.edit,'Открой «Эволюцию» и измени тело'],[P.eggsLaid>0,'Отложи икру в лагуне или на рифе (найди сородича ♥)'],[ns>=4,`Собери образцы четырёх зон (${ns}/4)`],[P.st.gill>0&&P.zones.deep,'Отрасти жабры и спустись на глубоководную равнину'],[lenMM()>=GOAL(),`Вырасти до ${GOAL()} мм (${lenMM().toFixed(1)})`],[P.done,'Выбери путь развития']];
- const nx=G.findIndex(g=>!g[0]);$('goal').innerHTML=`<div class="t" style="font-weight:600;margin-bottom:4px">Цели этапа</div>`+G.map((g,i)=>`<div style="color:${g[0]?'#7fd09f':i===nx?'#ffe08a':'#8aa0b0'}">${g[0]?'✓':i===nx?'▸':'·'} ${g[1]}</div>`).join('')+`<div class="small" style="margin-top:5px">${SAMPLE_Z.map(z=>`<div style="color:${P.samples[z]?'#7fd09f':'#a8b8c4'}">${P.samples[z]?'◆':'◇'} ${ZONES[z].ru}${P.samples[z]?'':' '+zoneDir(z)}</div>`).join('')}</div><div class="meter"><i style="width:${clamp(lenMM()/GOAL(),0,1)*100}%"></i></div><div class="small muted">Видов в рационе: ${Object.keys(P.eaten).length}/${Object.keys(SPEC).length} · Время: ${Math.floor(P.time/60)} мин</div>`;
+ const ns=SAMPLE_Z.filter(z=>P.samples[z]).length;const G=[[P.foodCount>=5,'Поешь планктон и водорослевые маты'],[P.pt>=1,'Купи первый атакующий орган — челюсти'],[P.pt>=3,`Сила хищника 3 (сейчас ${P.pt})`],[P.flags.edit,'Открой «Эволюцию» и измени тело'],[P.eggsLaid>0,'Отложи икру в лагуне или на рифе (найди сородича ♥)'],[ns>=4,`Собери образцы четырёх зон (${ns}/4)`],[P.st.gill>0&&P.zones.deep,'Отрасти жабры и спустись на глубоководную равнину'],[lenMM()>=GOAL(),`Вырасти до ${GOAL()} мм (${lenMM().toFixed(1)})`],[P.done,'Выбери путь развития']];
+ const nx=G.findIndex(g=>!g[0]);$('goal').innerHTML=`<div class="t" style="font-weight:600;margin-bottom:4px">Цели этапа</div>`+G.map((g,i)=>`<div style="color:${g[0]?'#7fd09f':i===nx?'#ffe08a':'#8aa0b0'}">${g[0]?'✓':i===nx?'▸':'·'} ${g[1]}</div>`).join('')+`<div class="small" style="margin-top:5px">${SAMPLE_Z.map(z=>`<div style="color:${P.samples[z]?'#7fd09f':'#a8b8c4'}">${P.samples[z]?'◆':'◇'} ${ZONES[z].ru}${P.samples[z]?'':' '+zoneDir(z)}</div>`).join('')}</div><div class="small" style="margin-top:5px">${Object.keys(BOSSES).map(id=>{const B=BOSSES[id],d=P.bosses[id];return`<div style="color:${d?'#7fd09f':P.pt>=B.need?'#ffd08a':'#a8b8c4'}">${d?'✓':'☠'} ${B.ru} <span class="muted">(сила ${B.need})</span>${d?'':' '+zoneDirX(B.x)}</div>`}).join('')}</div><div class="meter"><i style="width:${clamp(lenMM()/GOAL(),0,1)*100}%"></i></div><div class="small muted">Видов в рационе: ${Object.keys(P.eaten).length}/${Object.keys(SPEC).length} · Время: ${Math.floor(P.time/60)} мин</div>`;
  hints();}
 function zoneRange(z){let a=-HALF;for(const[n,b]of ZONE_X){if(n===z)return[a,Math.min(b,HALF)];a=b;}return[a,HALF];}
+function zoneDirX(x){const d=Math.abs(P.x-x);if(d<300)return'— рядом';return(x>P.x?'→ ':'← ')+(d/10>=1000?(d/10000).toFixed(1)+' км':Math.round(d/10)+' м');}
 function zoneDir(z){const[a,b]=zoneRange(z);if(P.x>=a&&P.x<=b)return'— ты здесь';const d=P.x<a?a-P.x:P.x-b;return(P.x<a?'→ ':'← ')+(d/10>=1000?(d/10000).toFixed(1)+' км':Math.round(d/10)+' м');}
 function floorTypeRu(){return{sand:'песок',mud:'ил',rock:'скалы',mat:'водорослевый мат',seep:'бактериальный мат'}[floorType(P.x)];}
 const HINTS=[[()=>P.o2<0.35&&P.z>SURF*0.75,'Кислорода мало — всплыви к самой поверхности: там можно сделать вдох.'],[()=>P.time<14&&touchUI,'Коснись экрана и веди пальцем — это джойстик. Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<14,'Плыви за курсором мыши или WASD (W/Пробел — вверх, S/Shift — вниз). Ешь светящийся планктон и тех, кто меньше тебя.'],[()=>P.time<40&&P.bm>=8&&!P.flags.edit,touchUI?'Накопились питательные вещества — нажми «Эволюция»: добавь сегмент или увеличь тело.':'Накопились питательные вещества — нажми <b>E</b>: добавь сегмент или увеличь тело.'],[()=>ents.some(e=>e.sp==='kin'&&e.mate&&d3(e,P)<P.st.L*6+30)&&!P.eggsLaid,'Рядом сородич с ♥. Подплыви вплотную и нажми <b>R</b>, чтобы отложить яйца: потомки — это запасные жизни.'],[()=>P.o2<0.35,'Кислорода мало: поднимись выше (Пробел). Жабры позволяют дышать глубже.'],[()=>lenMM()>=GOAL()&&!P.done,'Ты достаточно вырос — нажми «Завершить этап», чтобы выбрать путь развития.']];
 function hints(){const h=HINTS.find(q=>q[0]());$('hint').style.display=h?'':'none';if(h)$('hint').innerHTML=h[1];}
 /* ===== отрисовка ===== */
+function drawBossBar(){const e=ents.find(q=>q.boss&&!q.gone&&Math.abs(q.x-P.x)<viewR()*1.3);if(!e)return;const w=Math.min(420,W*0.6),x=(W-w)/2,y=H-(touchUI?190:120);ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='rgba(8,16,24,0.7)';ctx.fillRect(x-6,y-18,w+12,30);ctx.fillStyle='#ffd6c8';ctx.font='600 12px system-ui';ctx.textAlign='center';ctx.fillText(`${e.B.ru} · нужна сила ${e.B.need}`,W/2,y-5);ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fillRect(x,y,w,6);ctx.fillStyle='#e0503c';ctx.fillRect(x,y,w*clamp(e.hp/e.hpMax,0,1),6);ctx.textAlign='left';}
 function drawArrows(){const list=[];
  for(const e of ents){if(e.gone)continue;if(e.sp==='kin'&&e.mate)list.push([e,'rgba(255,140,190,0.9)']);else if(P.st.antenna&&e.S.beh==='hunt'&&e.tgt===P)list.push([e,'rgba(255,90,80,0.95)']);}
  for(const n of nests)if(n.own&&n.eggs)list.push([n,'rgba(255,230,140,0.9)']);if(P.un.scav)for(const c of carr)if(c.val>2)list.push([c,'rgba(190,140,90,0.85)']);
@@ -313,7 +325,7 @@ function render(dt){
  const list=ents.filter(e=>!e.gone&&Math.abs(e.x-cam.x)<vr).sort((a,b)=>b.st.Req-a.st.Req);
  for(const e of list)drawEnt(e);if(P.alive)drawPlayer();drawFx();
  for(let k=k0;k<decor.length;k++){const d=decor[k];if(Math.abs(d.x-cam.x)<vr)drawDecor(d);}ctx.globalAlpha=1;
- drawCurrents(dt);drawSnow(dt);const pp=proj(P.x,0,P.z);drawDark(pp[0],pp[1],cam.z,P.st.eyeQ);drawArrows();
+ drawCurrents(dt);drawSnow(dt);drawBossBar();const pp=proj(P.x,0,P.z);drawDark(pp[0],pp[1],cam.z,P.st.eyeQ);drawArrows();
  if(P.hit>0){ctx.fillStyle=`rgba(200,30,30,${P.hit*0.5})`;ctx.fillRect(0,0,W,H);}
  if(P.o2<0.25&&P.alive){const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.max(W,H)*0.7);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,`rgba(10,20,60,${(0.25-P.o2)*2.4})`);ctx.fillStyle=v;ctx.fillRect(0,0,W,H);}
 }

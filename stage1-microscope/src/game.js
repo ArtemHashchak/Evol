@@ -70,6 +70,16 @@ const NODES=[
  {id:'digest',ru:'Пищеварительная клетка',grp:'Специализация',cost:8,req:['spec'],unlock:'digest',desc:'+30% биомассы от любой еды за каждую клетку.'}
 ];
 const NODE=Object.fromEntries(NODES.map(n=>[n.id,n]));
+/* ===== пищевая цепь: уровни существ и «сила хищника» игрока ===== */
+const TIER={euglena:1,diatom:1,vorticella:1,egg:1,paramecium:2,nematode:2,didinium:2,heliozoa:3,spiker:3,bell:3,rival:3,rotifer:4,volvox:4,amoeba:4,hydra:5,stentor:5,tardigrade:5,chaos:6,asplanchna:6,oldhydra:6,cyclops:7,daphnia:7};
+const ATK_CELLS=['pseudo','spike','mouth','sting'],ATK_NODES=['jaws','sharp','barb','mastax','phago','nemabat'];
+function tierOf(e){return TIER[e.sp]||0;}
+function predLvl(){if(!D.cnt)return 0;let n=0;for(const t of ATK_CELLS)if(D.cnt[t])n++;for(const id of ATK_NODES)if(hasN(id))n++;return Math.min(6,n);}
+const TIER_RU=['','крошечные','мелкие','средние','крупные','огромные','гиганты','чудовища'];
+function edibleList(lv){return Object.keys(TIER).filter(k=>TIER[k]===lv&&SP[k]&&!SP[k].notSpecies).map(k=>SP[k].ru);}
+function dnaDim(sp){const k=P.killed[sp]||1;return Math.max(0.3,1/(1+0.15*(k-1)));}
+for(const n of NODES)if(ATK_NODES.includes(n.id)||['pseudo','spike','mouth','sting'].includes(n.id))n.desc+=' <b>+1 к силе хищника</b>'+(ATK_CELLS.includes(n.id)?' (если клетка есть в теле)':'')+'.';
+function giveDna(e,base){if(!base)return;const v=base*dnaDim(e.sp);P.dnaF=(P.dnaF||0)+v;let got=0;while(P.dnaF>=1){P.dnaF-=1;P.dna++;got++;}if(got)pop(e.x,e.y,'+'+got+' ДНК','#ffd47a');}
 /* виды: r — радиус столкновения в мкм */
 const SP={
  coccus:{ru:'Кокки',kind:'food',r:[1.3,2],hp:1,food:0.55,dna:0,spd:0,real:1,info:'Шарообразные бактерии. Главная еда мелочи.'},
@@ -131,7 +141,7 @@ let ST=MODES.bright;
 const SAVE_KEY='evo_stage1_v1';
 let P,D={},ents=[],parts=[],farObj=[],nearObj=[],lights=[],slime=[],pops=[],shots=[];
 let T=0,cam={x:0,y:0,s:1,ts:1,obj:0,trans:0},paused=true,editorOpen=false,started=false;
-function newPlayer(){return{x:0,y:0,a:0,vx:0,vy:0,hp:10,cells:[{q:0,r:0,t:'basic'}],hue:150,pattern:'none',biomass:0,dna:0,gen:1,un:{},
+function newPlayer(){return{x:0,y:0,a:0,vx:0,vy:0,hp:10,cells:[{q:0,r:0,t:'basic'}],hue:150,pattern:'none',biomass:0,dna:4,dnaF:0,gen:1,un:{},
  dashT:0,dashCd:0,stingCd:0,inv:2,hurt:0,lastHit:99,mode:'bright',kingdom:null,stats:{time:0,eaten:0,kills:0,div:0,deaths:0,eggs:0,mutAcc:0,sinceDeath:0,maxAllies:0,spores:0,cured:0,cycSurv:0},seen:{},ate:{},killed:{},modesSeen:{},slimeT:0,hintsDone:{},defects:{},defT:0,cystCd:0,zapCd:0,sporeSeed:(Math.random()*1e9)|0,sporesOpen:{},bossDone:{}};}
 
 /* ========== тело ========== */
@@ -164,6 +174,7 @@ function derive(){
  D.dashCd=C('vacuole')?4/(1+0.4*(C('vacuole')-1)):0;D.spikeDps=6*(hasN('sharp')?1.6:1);D.mouthDps=hasN('jaws')?12.6:7;D.sting=Math.max(E('sting'),hasN('nemabat')?1:0);D.eyes=C('eye');D.slime=C('slime');
  D.armorFrac=C('armor')/n;
  D.met=(1/120)*Math.pow(n,0.1)*(1+0.12*C('muscle')+0.08*C('nerve'))*(1-Math.min(0.4,0.07*C('digest')));D.satGain=0.11/Math.pow(n,0.4);
+ D.pl=predLvl();
  P.hp=Math.min(P.hp,D.hpMax);
 }
 function cellCost(){return Math.round((8+2.2*P.cells.length)*(hasN('fastdiv')?0.75:1));}
@@ -404,7 +415,7 @@ function updatePlayer(dt){
  if(P.vacs){for(const v of P.vacs)v.t+=dt*(D.digest||1);P.vacs=P.vacs.filter(v=>v.t<v.dur);}
 }
 function gain(b,photo){
- const before=P.biomass;P.biomass+=b*(photo?1:D.digest);P.sat=Math.min(1,(P.sat==null?1:P.sat)+b*D.satGain*(photo?1.6:1));
+ b*=0.7;const before=P.biomass;P.biomass+=b*(photo?1:D.digest);P.sat=Math.min(1,(P.sat==null?1:P.sat)+b*D.satGain*(photo?1.6:1));
  if(!hasN('adhesion')&&P.biomass>=14){P.biomass-=14;divide();}
 }
 function divide(){
@@ -449,7 +460,7 @@ function onAte(e){const s=SP[e.sp];if(!s||s.kind==='food')return;if(!P.ate[e.sp]
 function killEnt(e){
  if(e.dead||e.eaten)return;e.dead=true;const s=SP[e.sp];P.stats.kills++;ecoHit(e.sp);if(s.boss)bossKilled(e);P.killed[e.sp]=(P.killed[e.sp]||0)+1;if(e.sp==='egg')P.stats.eggs++;
  const n=Math.max(2,Math.min(10,Math.round(s.food/3)));for(let i=0;i<n;i++){const d=spawnFood(e.x+rnd(-1,1)*e.r*0.6,e.y+rnd(-1,1)*e.r*0.6,'detritus',s.food/n*0.9);d.vx=rnd(-15,15);d.vy=rnd(-15,15);}
- if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);
+ giveDna(e,s.dna);onAte(e);
 }
 function addVac(e){if(!D.cw||!D.cw.length)return;P.vacs=P.vacs||[];let bi=0,bd=1e9;for(let i=0;i<D.cw.length;i++){const w=D.cw[i];const d=Math.hypot(w.wx-e.x,w.wy-e.y);if(d<bd){bd=d;bi=i;}}
  if(P.vacs.filter(v=>v.ci===bi).length>=3)bi=(R_()*D.cw.length)|0;const s=SP[e.sp];const fv=e.sp==='detritus'?e.food:(s?s.food:1);
@@ -460,7 +471,7 @@ function eatEnt(e){
  if(e.sp==='kin'){return;}
  addVac(e);
  const f=e.sp==='detritus'?e.food:s.food*(e.hp/e.maxHp*0.5+0.5);gain(f);P.stats.eaten++;
- if(s&&s.kind!=='food'){ecoHit(e.sp);P.killed[e.sp]=(P.killed[e.sp]||0)+1;if(e.sp==='egg')P.stats.eggs++;if(s.dna){P.dna+=s.dna;pop(e.x,e.y,'+'+s.dna+' ДНК','#ffd47a');}onAte(e);pop(e.x,e.y+8,'+'+f.toFixed(0)+' биомассы','#e8c860');}
+ if(s&&s.kind!=='food'){ecoHit(e.sp);P.killed[e.sp]=(P.killed[e.sp]||0)+1;if(e.sp==='egg')P.stats.eggs++;giveDna(e,s.dna);onAte(e);pop(e.x,e.y+8,'+'+f.toFixed(0)+' биомассы','#e8c860');}
 }
 function finishDiv(e,s){
  const type=e.div.type,r0=e.r;e.div=null;const k=type==='long'?0.95:e.sp==='amoeba'?0.72:0.6;const nr=r0*k;
@@ -509,13 +520,13 @@ function updateEnts(dt){
    else if(!c.lead){const L=o;e.a=L.a;const px=-Math.sin(L.a),py=Math.cos(L.a);e.x+=(L.x+px*L.r*0.66-e.x)*Math.min(1,dt*4);e.y+=(L.y+py*L.r*0.66-e.y)*Math.min(1,dt*4);e.vx=L.vx;e.vy=L.vy;e.spin=L.spin;continue;}}
   let spd=s.spd*slow,wantA=null;
   // поведение
-  let flee=s.flee&&dP<e.r*5+pR*2&&pR>e.r*0.75&&!(e.sp==='euglena'&&(e.bond>0||Math.hypot(P.vx,P.vy)<D.speed*0.45));
+  let flee=(s.flee||(s.beh==='hunt'&&tierOf(e)<=D.pl&&D.pl>0))&&dP<e.r*5+pR*2&&tierOf(e)<=D.pl&&D.pl>0&&!(e.sp==='euglena'&&(e.bond>0||Math.hypot(P.vx,P.vy)<D.speed*0.45));
   if(flee||(e.aggro>0&&e.grp))e.fleeT=1.5;else if(e.fleeT>0)e.fleeT-=dt;
   if(!flee&&e.grp&&GRP[e.grp]&&GRP[e.grp].alarm&&dP<900)flee=true;
   if(s.beh==='hunt'||s.beh==='rotifer'){
    e.tgT-=dt;
    if(e.tgT<=0){e.tgT=0.5;e.tg=null;let bd=e.r*7+150;
-    const pTarget=!s.preyOnly&&s.beh!=='rotifer'&&P.inv<=0&&pR<e.r*(s.prey||1)&&dP<bd&&!(hasN('lumin')&&e.r<pR*2.5);
+    const pTarget=!s.preyOnly&&s.beh!=='rotifer'&&P.inv<=0&&tierOf(e)>D.pl&&dP<bd&&!(hasN('lumin')&&e.r<pR*2.5);
     if(pTarget){e.tg='P';bd=dP;}
     for(const o of ents){if(o===e||o.eaten||o.dead)continue;const os=SP[o.sp];if(!os||os.kind==='food'||os.kind==='virus'||os.kind==='rival')continue;if(s.preyOnly?o.sp!==s.preyOnly:(s.beh==='rotifer'?(o.r>e.r*0.3||o.sp==='egg'):o.r>e.r/1.4))continue;const d=Math.hypot(o.x-e.x,o.y-e.y);if(d<bd){bd=d;e.tg=o;}}
    }
@@ -615,19 +626,20 @@ function collide(dt){
   if(e.sp==='kin'||e.ally||e.rival){continue;}
   if(!s||s.kind==='food'){eatEnt(e);continue;}
   // организм
-  if(e.r<=pR*D.engulf&&e.sp!=='cyclops'){eatEnt(e);continue;}
+  if(e.r<=pR*D.engulf&&e.sp!=='cyclops'&&tierOf(e)<=D.pl+(tierOf(e)<=1?1:0)){eatEnt(e);continue;}
+  const weak=tierOf(e)>D.pl?0.12:1;if(weak<1&&!P.hintsDone['tier'+tierOf(e)]&&(D.edge.spike||D.edge.mouth)){P.hintsDone['tier'+tierOf(e)]=1;toast('<b>'+SP[e.sp].ru+'</b> тебе пока не по зубам: это существо уровня '+tierOf(e)+', а твоя сила хищника — '+D.pl+'. Купи ещё атакующий орган.');}
   if(e.sp==='diatom'&&!hasN('jaws')&&P.inv<=0&&Math.hypot(P.vx,P.vy)>D.speed*0.3){deathCause='порезался о диатомею';hurt(2.5*dt,cw.t);}
   // атаки игрока
   let attacked=false;
   for(const w of D.cw){if(!w.edge)continue;if(w.t!=='spike'&&w.t!=='mouth')continue;const d=Math.hypot(w.wx-e.x,w.wy-e.y);if(d>CELL_R*1.6+e.r)continue;
-   if(w.t==='spike'){e.hp-=D.spikeDps*dt*(e.sp==='diatom'?0.4:1);if(hasN('barb'))e.poison=3;attacked=true;}
-   else{const dm=D.mouthDps*dt*(e.sp==='diatom'&&!hasN('jaws')?0.5:1);e.hp-=dm;gain(dm*s.food/s.hp*0.6);attacked=true;}}
-  if(hasN('mastax')){let k=0;for(const w of D.cw){if(!w.edge||k>=3)continue;if(Math.hypot(w.wx-e.x,w.wy-e.y)<CELL_R*1.3+e.r){k++;const dm=2.5*dt;e.hp-=dm;gain(dm*s.food/s.hp*0.4);attacked=true;}}}
+   if(w.t==='spike'){e.hp-=D.spikeDps*dt*weak*(e.sp==='diatom'?0.4:1);if(hasN('barb'))e.poison=3;attacked=true;}
+   else{const dm=D.mouthDps*dt*weak*(e.sp==='diatom'&&!hasN('jaws')?0.5:1);e.hp-=dm;gain(dm*s.food/s.hp*0.6);attacked=true;}}
+  if(hasN('mastax')){let k=0;for(const w of D.cw){if(!w.edge||k>=3)continue;if(Math.hypot(w.wx-e.x,w.wy-e.y)<CELL_R*1.3+e.r){k++;const dm=2.5*dt*weak;e.hp-=dm;gain(dm*s.food/s.hp*0.4);attacked=true;}}}
   if(attacked){e.aggro=2;if(e.hp<=0){killEnt(e);continue;}}
   // урон игроку
   if(s.beh==='amoeba'&&pR<e.r*0.6){deathCause='переварен амёбой';hurt((s.edmg||7)*dt*(1-0.4*D.armorFrac),cw.t);P.x+=(e.x-P.x)*dt*0.8;P.y+=(e.y-P.y)*dt*0.8;continue;}
   let rotBite=false;if(s.beh==='rotifer'&&pR<e.r*0.6){const hx=e.x+Math.cos(e.a)*e.r*0.8,hy=e.y+Math.sin(e.a)*e.r*0.8;rotBite=Math.hypot(hx-P.x,hy-P.y)<pR+e.r*0.4;}
-  if(s.dmg&&(s.sting||(s.beh==='hunt'&&e.tg==='P')||rotBite)){deathCause='атака: '+s.ru.toLowerCase();hurt(s.dmg*dt,cw.t);}
+  if(s.dmg&&(s.sting||(s.beh==='hunt'&&e.tg==='P')||rotBite||(tierOf(e)>D.pl&&e.aggro>0))){deathCause='атака: '+s.ru.toLowerCase();hurt(s.dmg*dt*(tierOf(e)>D.pl?1:0.3),cw.t);}
   // расталкивание
   const nx=(e.x-cw.wx)/(cd||1),ny=(e.y-cw.wy)/(cd||1);const mP=D.n,mE=(e.r/10)**2;const tot=mP+mE;
   const push=Math.min(ov,6);if(s.beh!=='vort'){e.x+=nx*push*(mP/tot);e.y+=ny*push*(mP/tot);}if(s.beh!=='sessile'){}P.x-=nx*push*(mE/tot);P.y-=ny*push*(mE/tot);
@@ -1031,6 +1043,7 @@ function drawWorld(){
   if(e.ally){ctx.strokeStyle='rgba(255,210,90,0.55)';ctx.lineWidth=1.2*PX;ctx.setLineDash([3*PX,3*PX]);circ(0,0,e.r*1.2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.globalAlpha=1;
   if((e.hitT>0||e.boss||e.rival)&&e.maxHp>0&&SP[e.sp]&&SP[e.sp].kind!=='food')hpBar(e);
+  if(tierOf(e)>0&&!e.ally&&!e.rival&&!e.eaten&&!e.dead){const tl=tierOf(e),ed=tl<=D.pl;ctx.fillStyle=ed?'rgba(120,230,140,0.85)':tl===D.pl+1?'rgba(255,200,90,0.9)':'rgba(255,90,80,0.9)';circ(e.x,e.y-e.r-7*PX,2.4*PX);ctx.fill();}
  }
  if(hasN('lumin')){const gl=ctx.createRadialGradient(P.x,P.y,D.R*0.5,P.x,P.y,D.R*2.2);const pa=0.5+0.5*Math.sin(T*2);gl.addColorStop(0,ST.dark?`rgba(120,220,255,${0.18+0.1*pa})`:`rgba(120,200,255,${0.12+0.06*pa})`);gl.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gl;circ(P.x,P.y,D.R*2.2);ctx.fill();}
  // игрок
@@ -1096,7 +1109,7 @@ function hud(){
  if(!hasN('adhesion')){$('bmLbl').textContent='До деления';$('bmBar').style.width=(P.biomass/14*100)+'%';$('bmTxt').textContent=P.biomass.toFixed(1)+' / 14';}
  else{const c=cellCost();$('bmLbl').textContent='Биомасса (клетка = '+c+')';$('bmBar').style.width=Math.min(100,P.biomass/c*100)+'%';$('bmTxt').textContent=Math.floor(P.biomass)+'';}
  $('satBar').style.width=((P.sat==null?1:P.sat)*100).toFixed(0)+'%';$('satBar').style.background=P.sat<0.25?'#e06050':'#7fb0ff';$('satLbl').innerHTML=P.starving?'<span style="color:#ff8a7a">Голод! Тело слабеет — ешь</span>':'Сытость';
- $('cellTxt').textContent=D.n;$('dnaTxt').textContent=P.dna;
+ $('cellTxt').textContent=D.n;if($('plTxt'))$('plTxt').textContent=D.pl;$('dnaTxt').textContent=P.dna;
  const dk=Object.keys(P.defects);$('defTxt').innerHTML=dk.length?'Дефект: '+dk.map(k=>DEFECTS[k].ru+' ('+DEFECTS[k].d+', ещё '+P.defects[k]+' пок.)').join(', '):'';
  $('bZap').classList.toggle('hidden',!hasN('electro'));if(hasN('electro'))$('bZap').textContent=P.zapCd>0?'Разряд '+P.zapCd.toFixed(1)+'с':'Разряд (Q)';$('tZap').classList.toggle('hidden',!hasN('electro'));
  $('bDash').classList.toggle('hidden',!D.dashCd);if(D.dashCd)$('bDash').textContent=P.dashCd>0?'Рывок '+P.dashCd.toFixed(1)+'с':'Рывок (Пробел)';

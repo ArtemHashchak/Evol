@@ -4,7 +4,7 @@ const PARTS={
  cameye:{ru:'Глаза-камеры',head:1,cost:10,node:'cameye',desc:'Глаз с хрусталиком, как у позвоночных: хорошо видно в темноте.'},
  compound:{ru:'Фасеточные глаза',head:1,cost:10,node:'compound',desc:'Сотни фасеток, как у трилобита: широкий обзор, видно хищников издали.'},
  antenna:{ru:'Усики',head:1,cost:5,node:'antenna',desc:'Чувствуют вибрации воды: стрелки показывают хищников за краем экрана.'},
- jaws:{ru:'Челюсти',head:1,cost:8,node:'jaws',desc:'Сильный укус, можно глотать добычу крупнее.'},
+ jaws:{ru:'Челюсти',head:1,cost:6,node:'jaws',desc:'Сильный укус, можно глотать добычу крупнее.'},
  grab:{ru:'Хватательные клешни',head:1,cost:12,node:'grab',desc:'Как у аномалокариса: хватают и удерживают добычу, добавляя урон.'},
  proboscis:{ru:'Хоботок',head:1,single:1,cost:8,node:'proboscis',desc:'Как у опабинии: длинный хоботок с клешнёй достаёт добычу издалека.'},
  tentacle:{ru:'Щупальца',cost:6,node:'tentacle',desc:'Ловят мелочь вокруг и слегка жалят.'},
@@ -27,10 +27,13 @@ const NODES=[
  {id:'compound',ru:'Фасеточные глаза',grp:'Чувства',cost:9,req:['exo']},
  {id:'antenna',ru:'Усики',grp:'Чувства',cost:4,req:[]},
  {id:'jaws',ru:'Челюсти',grp:'Оружие',cost:6,req:[]},
- {id:'grab',ru:'Хватательные клешни',grp:'Оружие',cost:11,req:['jaws']},
- {id:'proboscis',ru:'Хоботок',grp:'Оружие',cost:8,req:[]},
- {id:'spine',ru:'Шипы',grp:'Оружие',cost:4,req:[]},
- {id:'tentacle',ru:'Щупальца',grp:'Оружие',cost:5,req:[]},
+ {id:'jaws2',ru:'Зубчатые челюсти',grp:'Оружие',cost:20,req:['jaws'],desc:'Зубцы по краю челюстей прорезают панцири.'},
+ {id:'venom',ru:'Ядовитая железа',grp:'Оружие',cost:24,req:['tentacle'],desc:'Яд в щупальцах и укусе — добыча слабеет.'},
+ {id:'cnido',ru:'Стрекательные батареи',grp:'Оружие',cost:14,req:['tentacle'],desc:'Гроздья стрекательных клеток, как у медуз.'},
+ {id:'grab',ru:'Хватательные клешни',grp:'Оружие',cost:16,req:['jaws']},
+ {id:'proboscis',ru:'Хоботок',grp:'Оружие',cost:12,req:[]},
+ {id:'spine',ru:'Шипы',grp:'Оружие',cost:9,req:[]},
+ {id:'tentacle',ru:'Щупальца',grp:'Оружие',cost:8,req:[]},
  {id:'exo',ru:'Панцирь',grp:'Скелет',cost:10,req:[],zone:'reef',desc:SKELS.exo.desc+' Нужна известь с рифов.'},
  {id:'notochord',ru:'Хорда',grp:'Скелет',cost:10,req:[],desc:SKELS.notochord.desc},
  {id:'shell',ru:'Раковина',grp:'Скелет',cost:10,req:[],zone:'reef',desc:SKELS.shell.desc+' Нужна известь с рифов.'},
@@ -50,9 +53,14 @@ const NODES=[
  {id:'symb',ru:'Симбиоз с водорослями',grp:'Питание',cost:9,req:['radula'],zone:'lagoon',desc:'Водоросли в коже кормят тебя на свету (на мелководье сытость растёт сама).'},
  {id:'scav',ru:'Падальщик',grp:'Питание',cost:5,req:[],desc:'Падаль даёт в 1.6 раза больше, коричневые стрелки ведут к ней.'},
  {id:'stomach',ru:'Мощный желудок',grp:'Питание',cost:9,req:['jaws'],desc:'Из добычи усваивается на 40% больше питательных веществ.'},
- {id:'chemo',ru:'Хемосинтез',grp:'Питание',cost:12,req:['scav'],zone:'seeps',desc:'Бактерии-симбионты кормят тебя в темноте глубин и снижают потребность в кислороде.'}
+ {id:'chemo',ru:'Хемосинтез',grp:'Питание',cost:12,req:['scav'],zone:'seeps',desc:'Бактерии-симбионты кормят тебя в темноте глубин и снижают потребность в кислороде.'},
+ {id:'crown',ru:'Корона шипов',grp:'Трофеи боссов',cost:0,req:[],trophy:1,desc:'Наследство Королевы рифа: шипы ранят нападающих вдвое сильнее. +1 к силе хищника.'},
+ {id:'nettle',ru:'Жгучие нити',grp:'Трофеи боссов',cost:0,req:[],trophy:1,desc:'Наследство Великой медузы: невидимые нити жгут всех мелких существ вокруг тебя.'},
+ {id:'lure',ru:'Светящийся фонарь',grp:'Трофеи боссов',cost:0,req:[],trophy:1,desc:'Наследство исполинской опабинии: видишь в темноте и подманиваешь планктон.'},
+ {id:'seepheart',ru:'Сердце сипов',grp:'Трофеи боссов',cost:0,req:[],trophy:1,desc:'Наследство Древнего жнеца: здоровье +40%, кислорода нужно на 40% меньше.'}
 ];
-for(const n of NODES){if(!n.desc)n.desc=PARTS[n.id]?PARTS[n.id].desc:'';}
+const ATK_PARTS=['jaws','tentacle','proboscis','spine','grab'],ATK_NODES=['jaws2','venom','cnido','crown'];
+for(const n of NODES){if(!n.desc)n.desc=PARTS[n.id]?PARTS[n.id].desc:'';if(ATK_PARTS.includes(n.id))n.desc+=' <b>+1 к силе хищника</b>, если часть есть на теле.';else if(ATK_NODES.includes(n.id)&&n.id!=='crown')n.desc+=' <b>+1 к силе хищника.</b>';}
 const NODE=Object.fromEntries(NODES.map(n=>[n.id,n]));
 
 function defaultBody(sym){
@@ -73,10 +81,10 @@ function bodyStats(b,un){
  st.speed=11*Math.pow(thr,0.7)*Math.pow(Req,0.55)*shellPen*(radial?0.75:1)*(un.streamline?1.2:1);
  st.crawl=crawl>0?9*Math.pow(1+crawl,0.65)*Math.pow(Req,0.55):0;
  st.turn=(radial?1.6:2.6)*(1+0.12*(c.fin||0)+(un.brain1?0.25:0))/Math.pow(Req,0.22);
- let hp=0;for(const s of segs)hp+=8*s.r*s.r+4;st.hpMax=hp*(radial?1.5:1);
+ let hp=0;for(const s of segs)hp+=8*s.r*s.r+4;st.hpMax=hp*(radial?1.5:1)*(un.seepheart?1.4:1);
  st.armor=b.skel==='exo'?0.6:b.skel==='shell'?0.5:1;
  st.gill=(c.gill||0)*(un.biggill?1.7:1);
- st.eyeQ=clamp(((c.eyes||0)*0.12+(c.cameye||0)*0.35+(c.compound||0)*0.3),0,1);
+ st.eyeQ=clamp(((c.eyes||0)*0.12+(c.cameye||0)*0.35+(c.compound||0)*0.3)+(un.lure?0.5:0),0,1);
  st.bite=(2+(c.jaws||0)*4+(c.grab||0)*3)*Math.sqrt(Req);
  st.swallow=(c.jaws?0.55:0.32)*(radial?1.2:1);
  st.reach=(c.proboscis?Req*2.2+segs[0].r*2:0);

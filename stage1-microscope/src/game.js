@@ -223,7 +223,7 @@ function initWorld(){
  for(let i=0;i<170;i++)parts.push({x:rnd(-1,1),y:rnd(-1,1),z:rnd(0.2,1),r:rnd(0.3,1.1),init:1});
  farObj=[];for(let i=0;i<20;i++)farObj.push({x:rnd(0,1),y:rnd(0,1),r:rnd(0.012,0.045),k:pick(['blob','rod','ring','cell','diatom']),a:rnd(0,TAU),h:rnd(0,360),v:rnd(-0.004,0.004)});
  nearObj=[];for(let i=0;i<4;i++)nearObj.push({x:rnd(0,1),y:rnd(0,1),r:rnd(0.12,0.3),a:rnd(0,TAU),k:pick(['blob','ring'])});
- fillWorld(true);
+ fillWorld(true);clearAround();
 }
 function viewD(){return OBJ[cam.obj].d;}
 function spawnEnt(sp,x,y){
@@ -482,7 +482,7 @@ function playerDie(){
  let newDef=null;if(R_()<0.25){const o=Object.keys(DEFECTS).filter(k=>!P.defects[k]);if(o.length){newDef=pick(o);P.defects[newDef]=2;}}
  derive();const lost=Math.round(P.biomass*0.3);P.biomass-=lost;
  const a=rnd(0,TAU);P.x+=Math.cos(a)*600;P.y+=Math.sin(a)*600;const dc=Math.hypot(P.x,P.y);if(dc>DROP_R*0.9){P.x*=DROP_R*0.9/dc;P.y*=DROP_R*0.9/dc;}
- P.hp=D.hpMax;P.inv=3;P.vx=P.vy=0;P.vacs=[];P.sat=Math.max(P.sat||0,0.6);
+ [P.x,P.y]=safeSpot(P.x,P.y,D.R);P.hp=D.hpMax;P.inv=3;P.vx=P.vy=0;P.vacs=[];P.sat=Math.max(P.sat||0,0.6);
  ents=ents.filter(e=>Math.hypot(e.x-P.x,e.y-P.y)>viewD()*0.5||(SP[e.sp]&&SP[e.sp].kind==='food'));
  cam.x=P.x;cam.y=P.y;
  if(window.__deaths)window.__deaths.push(deathCause);toast('Ты погиб'+(deathCause?' ('+deathCause+')':'')+'. Род продолжает потомок — <b>поколение '+P.gen+'</b>. Потеряно '+lost+' биомассы.');
@@ -652,6 +652,16 @@ function updateEnts(dt){
 }
 /* столкновения игрока */
 function effR(e,x,y){const w=WR[e.sp];if(!w||w>=0.95)return e.r;const L=e.sp==='nematode'?e.r*1.5:e.r;const th=Math.atan2(y-e.y,x-e.x)-e.a;const c=Math.cos(th),sn=Math.sin(th);return L*w/Math.sqrt((w*c)**2+sn*sn);}
+function spotFree(x,y,r){if(inThicket(x,y))return false;for(const e of ents){const s=SP[e.sp];if(!s||s.kind||e.eaten||e.dead)continue;if(Math.hypot(e.x-x,e.y-y)<e.r+r+40)return false;}return true;}
+function safeSpot(x,y,r){if(spotFree(x,y,r))return[x,y];for(let k=1;k<120;k++){const a=k*2.4,d=80+k*45;const nx=x+Math.cos(a)*d,ny=y+Math.sin(a)*d;if(Math.hypot(nx,ny)<DROP_R*0.9&&spotFree(nx,ny,r))return[nx,ny];}return[x,y];}
+function clearAround(){[P.x,P.y]=safeSpot(P.x,P.y,D.R||10);ents=ents.filter(e=>{const s=SP[e.sp];return!(s&&!s.kind&&!e.boss&&Math.hypot(e.x-P.x,e.y-P.y)<e.r+(D.R||10)+40);});cam.x=P.x;cam.y=P.y;}
+/* все организмы в одной плоскости: толкают друг друга по массе и не проходят сквозь заросли */
+function bodyMass(e){let m=(e.r/10)**2;if(e.ax!=null)m*=6;if(e.sp==='cyclops'||e.sp==='daphnia')m*=4;return m;}
+function solidEnt(e){const s=SP[e.sp];if(!s||s.kind||e.eaten||e.dead||e.conj||e.div)return false;return!(e.sp==='amoeba'||e.sp==='chaos'||e.sp==='vorticella'||e.sp==='egg');}
+function entCollide(){const vd=viewD()*1.6;const list=ents.filter(e=>solidEnt(e)&&Math.abs(e.x-P.x)<vd&&Math.abs(e.y-P.y)<vd);
+ for(let i=0;i<list.length;i++){const a=list[i];for(let j=i+1;j<list.length;j++){const b=list[j];const dx=b.x-a.x,dy=b.y-a.y,lim=a.r+b.r;if(Math.abs(dx)>lim||Math.abs(dy)>lim)continue;const d=Math.hypot(dx,dy)||0.01;const ov=effR(a,b.x,b.y)+effR(b,a.x,a.y)-d-2;if(ov<=0)continue;
+  const ma=bodyMass(a),mb=bodyMass(b),t=ma+mb,nx=dx/d,ny=dy/d,p=Math.min(ov,10);if(a!==host){a.x-=nx*p*(mb/t);a.y-=ny*p*(mb/t);}if(b!==host){b.x+=nx*p*(ma/t);b.y+=ny*p*(ma/t);}}}
+ for(const e of list){if(e.r>90||e.ax!=null)continue;for(const t of thickets){if(Math.hypot(e.x-t.x,e.y-t.y)>t.r*1.1+e.r)continue;const[px,py]=filPush(e.x,e.y,Math.min(e.r*0.6,22));e.x+=px;e.y+=py;}}}
 function collide(dt){if(host)return;
  const pR=D.R;
  if(thickets.some(t=>Math.hypot(P.x-t.x,P.y-t.y)<t.r*1.1+pR)){let sx=0,sy=0,n=0;for(const w of D.cw){const[px,py]=filPush(w.wx,w.wy,CELL_R*0.95);if(px||py){sx+=px;sy+=py;n++;}}if(n){P.x+=sx/n;P.y+=sy/n;const vl=Math.hypot(sx,sy)||1;const dot=(P.vx*sx+P.vy*sy)/vl;if(dot<0){P.vx-=sx/vl*dot;P.vy-=sy/vl*dot;}}}
@@ -683,7 +693,7 @@ function collide(dt){if(host)return;
   if(e.sp==='stentor'&&P.suckT>0)continue;
   // расталкивание
   const nx=(e.x-cw.wx)/(cd||1),ny=(e.y-cw.wy)/(cd||1);const mP=D.n,mE=(e.r/10)**2;const tot=mP+mE;
-  const push=Math.min(ov,6);if(s.beh!=='vort'){e.x+=nx*push*(mP/tot);e.y+=ny*push*(mP/tot);}if(s.beh!=='sessile'){}P.x-=nx*push*(mE/tot);P.y-=ny*push*(mE/tot);
+  const push=Math.min(ov,12);if(s.beh!=='vort'){e.x+=nx*push*(mP/tot);e.y+=ny*push*(mP/tot);}if(s.beh!=='sessile'){}P.x-=nx*push*(mE/tot);P.y-=ny*push*(mE/tot);
  }
 }
 
@@ -1393,7 +1403,7 @@ let last=performance.now();
 function frame(now){
  let dt=Math.min(0.05,(now-last)/1000);last=now;
  if(!paused&&started){
-  T+=dt;updatePlayer(dt);updateCellWorld();updateEnts(dt);collide(dt);updateSpores(dt);moldUpdate(dt);updateCellWorld();
+  T+=dt;updatePlayer(dt);updateCellWorld();updateEnts(dt);collide(dt);entCollide();updateSpores(dt);moldUpdate(dt);updateCellWorld();
   if(!cycE){cycT-=dt;if(cycT<=0){cycT=rnd(360,540);spawnCyclops();}}
   rivalT-=dt;if(rivalT<=0){rivalT=rnd(25,45);if(ents.filter(e=>e.rival).length<2&&P.cells.length>=2)spawnRival();}
   bossCheck(dt);

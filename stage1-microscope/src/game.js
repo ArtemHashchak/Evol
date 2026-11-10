@@ -428,7 +428,7 @@ function doDash(){if(!started||paused||!D.dashCd||P.dashCd>0)return;P.dashT=0.35
 
 /* ========== игрок ========== */
 function updatePlayer(dt){
- calcDay();regrowTick(dt);
+ calcDay();regrowTick(dt);if(P.suckT>0)P.suckT-=dt;
  if(host)hostTick(dt);
  const[dx,dy,thr]=host?[0,0,0]:inputDir();
  if(thr>0){const da=Math.atan2(dy,dx);let diff=((da-P.a+Math.PI*3)%TAU)-Math.PI;const mt=D.turn*dt;P.a+=clamp(diff,-mt,mt);}
@@ -580,10 +580,10 @@ function updateEnts(dt){
    e.wa+=rnd(-1,1)*dt*0.6;wantA=e.wa;if(pR<e.r*0.6&&dP<e.r*2.5&&P.inv<=0)wantA=Math.atan2(P.y-e.y,P.x-e.x);
    for(const o of ents){if(o===e||o.eaten||!SP[o.sp]||o.r>e.r*0.5)continue;if(Math.abs(o.x-e.x)<e.r&&Math.abs(o.y-e.y)<e.r&&Math.hypot(o.x-e.x,o.y-e.y)<e.r*0.9){o.eaten=0.001;o.by=e;}}
   }else if(s.beh==='sessile'){
-   e.x+=(e.ax-e.x)*dt;e.y+=(e.ay-e.y)*dt;e.a+=Math.sin(e.t*0.3)*dt*0.1;spd=0;
+   e.x+=(e.ax-e.x)*dt;e.y+=(e.ay-e.y)*dt;e.a+=Math.sin(e.t*0.3)*dt*0.1;spd=0;e.suckK=Math.max(0,(e.suckK||0)-dt*1.5);
    const fx=Math.cos(e.a),fy=Math.sin(e.a),cx=e.x+fx*e.r*0.85,cy=e.y+fy*e.r*0.85;
    for(const o of ents){if(o.eaten||o===e||o.r>e.r*0.15)continue;const vx=cx-o.x,vy=cy-o.y,vl=Math.hypot(vx,vy);if(vl<e.r*0.9&&vl>1){o.x+=(vx/vl*40-vy/vl*25)*dt;o.y+=(vy/vl*40+vx/vl*25)*dt;if(vl<e.r*0.12){o.eaten=0.001;o.by=e;}}}
-   if(!host&&P.inv<=0&&D.pl<tierOf(e)&&pR<e.r*0.5){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy),reach=e.r*1.35;if(vl<reach&&vl>0.5){const k=1-vl/reach,pull=25+75*k*k;P.x+=(vx/vl*pull-vy/vl*pull*0.55)*dt;P.y+=(vy/vl*pull+vx/vl*pull*0.55)*dt;e.suck=1;if(!P.hintsDone.stentor){P.hintsDone.stentor=1;toast('<b>Трубач затягивает тебя в воронку!</b> Плыви прочь изо всех сил или делай рывок — в его рту не выжить.');}
+   if(!host&&P.inv<=0&&D.pl<tierOf(e)&&pR<e.r*0.5){const vx=cx-P.x,vy=cy-P.y,vl=Math.hypot(vx,vy),reach=e.r*1.35;if(vl<reach&&vl>0.5){const k=1-vl/reach,pull=25+75*k*k;e.suckK=Math.max(e.suckK,0.4+0.6*k);P.suckK=k;P.suckX=cx;P.suckY=cy;P.suckT=0.2;P.x+=(vx/vl*pull-vy/vl*pull*0.55)*dt;P.y+=(vy/vl*pull+vx/vl*pull*0.55)*dt;if(!P.hintsDone.stentor){P.hintsDone.stentor=1;toast('<b>Трубач затягивает тебя в воронку!</b> Плыви прочь изо всех сил или делай рывок — в его рту не выжить.');}
     if(vl<e.r*0.16+pR*0.3){deathCause='всосан трубачом';P.hp=0;hurt(D.hpMax*5,null);}}}
   }else if(s.beh==='egg'){spd=0;
   }else if(s.beh==='hydra'){
@@ -951,6 +951,10 @@ const DRAW={
 /* ========== рисование клеток игрока ========== */
 let BS=null;function playerBS(){return{hue:P.hue,pattern:P.pattern,un:P.un};}
 function cellPath(w,t,r){ctx.beginPath();const N=16;for(let i=0;i<=N;i++){const th=i/N*TAU;const rr=r*(1+0.045*Math.sin(th*3+t*1.3+w.seed*20)+0.03*Math.sin(th*5-t*0.9+w.seed*7));const x=w.bx+Math.cos(th)*rr,y=w.by+Math.sin(th)*rr;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();}
+function drawVortex(e,t){const L=e.r,k=0.3+0.7*(e.suckK||0),reach=L*1.35;ctx.save();ctx.translate(L*0.9,0);ctx.lineCap='round';
+ for(let a=0;a<6;a++){ctx.beginPath();for(let i=0;i<=28;i++){const u=i/28,r=reach*(1-u),ang=a/6*TAU+u*5.5-t*(1.5+4*k);const x=Math.cos(ang)*r,y=Math.sin(ang)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.strokeStyle=ST.dark?`rgba(190,230,255,${0.26*k})`:`rgba(30,60,80,${0.3*k})`;ctx.lineWidth=PX*(0.8+2.2*k);ctx.stroke();}
+ for(let i=0;i<26;i++){const ph=(t*(0.3+0.6*k)+hash(i,7))%1;const r=reach*(1-ph);const ang=hash(i,3)*TAU+ph*6-t*2;ctx.fillStyle=ST.dark?`rgba(220,240,255,${0.6*k*ph})`:`rgba(40,55,50,${0.5*k*ph})`;circ(Math.cos(ang)*r,Math.sin(ang)*r,Math.max(PX*0.6,PX*(0.6+1.6*(1-ph))));ctx.fill();}
+ const g=ctx.createRadialGradient(0,0,0,0,0,L*0.32);g.addColorStop(0,`rgba(8,16,35,${0.45*k})`);g.addColorStop(1,'rgba(8,16,35,0)');ctx.fillStyle=g;circ(0,0,L*0.32);ctx.fill();ctx.restore();}
 function drawAppendage(w,t){
  const x=w.bx+w.ox*CELL_R*0.9,y=w.by+w.oy*CELL_R*0.9,ang=Math.atan2(w.oy,w.ox);
  if(!w.edge)return;
@@ -1078,6 +1082,7 @@ function drawWorld(){
    else if(e.sp==='amoeba'){for(const sg of[-1,1]){ctx.save();ctx.translate(0,sg*e.r*0.75*p);ctx.scale(1-0.28*p,1-0.28*p);f(e,T);ctx.restore();}}
    else{for(const sg of[-1,1]){ctx.save();ctx.translate(sg*e.r*0.5*p,0);ctx.scale(1-0.4*p,1);f(e,T);ctx.restore();}}}
   else f(e,T);
+  if(e.sp==='stentor'&&!e.eaten)drawVortex(e,T);
   if(e.conj&&e.conj.lead){const r=e.r;ctx.strokeStyle=ST.nucRim(0.8);ctx.lineWidth=PX*1.2;ctx.beginPath();for(let k=-3;k<=3;k++){const x=k*r*0.07;ctx.moveTo(x,r*0.22);ctx.lineTo(x+Math.sin(T*6+k)*r*0.02,r*0.44);}ctx.stroke();ctx.fillStyle=ST.nuc(1.6);circ(Math.sin(T*1.5)*r*0.12,r*0.33,r*0.04);ctx.fill();}
   if(e.bond>0){ctx.strokeStyle='rgba(255,210,90,0.9)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(0,0,e.r*1.25,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,e.bond/3));ctx.stroke();}
   if(e.infested){ctx.strokeStyle=`rgba(190,80,230,${0.5+0.3*Math.sin(T*4)})`;ctx.lineWidth=2*PX;ctx.setLineDash([2*PX,4*PX]);circ(0,0,e.r*1.08);ctx.stroke();ctx.setLineDash([]);}
@@ -1089,6 +1094,7 @@ function drawWorld(){
  if(hasN('lumin')){const gl=ctx.createRadialGradient(P.x,P.y,D.R*0.5,P.x,P.y,D.R*2.2);const pa=0.5+0.5*Math.sin(T*2);gl.addColorStop(0,ST.dark?`rgba(120,220,255,${0.18+0.1*pa})`:`rgba(120,200,255,${0.12+0.06*pa})`);gl.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gl;circ(P.x,P.y,D.R*2.2);ctx.fill();}
  // игрок
  ctx.save();ctx.translate(P.x,P.y);ctx.rotate(P.a);
+ if(P.suckT>0){const k=clamp(P.suckK||0,0,1),ang=Math.atan2(P.suckY-P.y,P.suckX-P.x)-P.a;ctx.rotate(ang);ctx.scale(1+0.45*k,1-0.28*k);ctx.rotate(-ang+Math.sin(T*25)*0.05*k);}
  const flick=host?0.4:P.inv>0?0.55+0.45*Math.sin(T*20):1;BS=playerBS();drawBody(D.cw,T,P.x,P.y,P.a,flick);
  if(P.cdmg)for(const w of D.cw){const d=P.cdmg[w.q+','+w.r];if(!d)continue;const k=clamp(d/(TYPES[w.t].hp*2.2*(w.t==='armor'?2:1)),0,1);ctx.strokeStyle=`rgba(255,60,50,${0.25+0.6*k})`;ctx.lineWidth=(1+2*k)*PX;ctx.beginPath();ctx.arc(w.bx,w.by,CELL_R*0.75,0,TAU*k);ctx.stroke();}
  if(P.lost&&P.lost.length)for(const L of P.lost){const[hx,hy]=hexXY(L.q,L.r);const bx=hx-D.mx,by=hy-D.my;ctx.setLineDash([3*PX,3*PX]);ctx.strokeStyle=ST.dark?'rgba(200,230,255,0.45)':'rgba(60,60,50,0.45)';ctx.lineWidth=1.2*PX;circ(bx,by,CELL_R*0.9);ctx.stroke();ctx.setLineDash([]);ctx.strokeStyle='rgba(120,220,140,0.8)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(bx,by,CELL_R*0.9,-Math.PI/2,-Math.PI/2+TAU*(1-L.time/L.max));ctx.stroke();}
@@ -1100,6 +1106,8 @@ function drawWorld(){
 }
 function drawOverlay(){
  ctx.setTransform(DPR,0,0,DPR,0,0);
+ if(P.suckT>0){const k=clamp(P.suckK||0,0,1),sx=(P.suckX-cam.x)*cam.s+W/2,sy=(P.suckY-cam.y)*cam.s+H/2;const g=ctx.createRadialGradient(sx,sy,Math.min(W,H)*0.08,sx,sy,Math.max(W,H)*0.8);g.addColorStop(0,`rgba(10,15,30,${0.35*k})`);g.addColorStop(0.35,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(40,5,15,${0.45*k+0.1*Math.sin(T*10)*k})`);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(sx,sy);ctx.strokeStyle=`rgba(255,255,255,${0.12*k})`;ctx.lineWidth=2;for(let a=0;a<10;a++){const an=a/10*TAU-T*3;ctx.beginPath();ctx.arc(0,0,Math.min(W,H)*(0.25+0.05*Math.sin(T*4+a)),an,an+0.5);ctx.stroke();}ctx.restore();}
  if(DAYK<0.995){ctx.fillStyle=`rgba(4,8,32,${(1-DAYK)*(ST.dark?0.32:0.45)})`;ctx.fillRect(0,0,W,H);
   if(DAYK<0.7){ctx.save();ctx.globalCompositeOperation='lighter';const nk=(0.7-DAYK)/0.58;for(const e of ents){if(e.eaten||e.dead)continue;let gr=0,col='';if(e.sp==='noct'){gr=e.r*2.6;col='90,200,255';}else if(e.sp==='bell'){gr=e.r*1.6;col='160,120,255';}else if(e.sp==='plasmid'){gr=e.r*5;col='255,210,90';}if(!gr)continue;const sx=(e.x-cam.x)*cam.s+W/2,sy=(e.y-cam.y)*cam.s+H/2,R0=gr*cam.s;if(sx<-R0||sx>W+R0||sy<-R0||sy>H+R0)continue;const a=nk*(0.3+0.2*Math.sin(T*3+e.seed*9))*(e.sp==='noct'&&Math.hypot(e.vx||0,e.vy||0)>3?1.6:1);const g=ctx.createRadialGradient(sx,sy,0,sx,sy,R0);g.addColorStop(0,`rgba(${col},${a})`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.fillRect(sx-R0,sy-R0,R0*2,R0*2);}ctx.restore();}}
  if(FX.vig){const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.hypot(W,H)*0.55);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,ST.vig);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}

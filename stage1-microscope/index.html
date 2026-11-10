@@ -80,13 +80,13 @@ table.runs th{color:#8a94a8;font-weight:500}.best{color:#9fe0a8;font-weight:600}
  <div class="lbl"><span id="satLbl">Сытость</span><span></span></div><div class="bar"><i id="satBar" style="background:#7fb0ff"></i></div>
  <div class="lbl"><span id="bmLbl">Биомасса</span><span id="bmTxt"></span></div><div class="bar"><i id="bmBar"></i></div>
  <div class="lbl"><span>Клеток: <b id="cellTxt">1</b> / 30</span><span>ДНК: <b id="dnaTxt" style="color:#ffd47a">0</b></span><span title="Сила хищника: ешь существ этого уровня и ниже. Зелёная точка — можно съесть, жёлтая — следующий уровень, красная — опасно.">Хищник: <b id="plTxt" style="color:#ff9a7a">0</b></span></div>
- <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bAch">Итоги</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bZap" class="hidden">Разряд (Q)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
+ <div id="hudBtns"><button id="bEdit">Эволюция (E)</button><button id="bSet">Настройки</button><button id="bAch">Итоги</button><button id="bPara" class="hidden">Проникнуть (R)</button><button id="bDash" class="hidden">Рывок (Пробел)</button><button id="bZap" class="hidden">Разряд (Q)</button><button id="bFinal" class="hidden on">Выйти из капли</button></div>
 </div>
 <div id="scale"><div id="sbLine"></div><span id="sbText"></span><div id="obj"></div></div>
 <div id="toasts"></div>
 <div id="hint" class="panel"></div>
 <div id="goal" class="panel"></div>
-<div id="touch"><button id="tZap" class="hidden">Разряд</button><button id="tDash">Рывок</button><button id="tEdit">Эволюция</button></div>
+<div id="touch"><button id="tPara" class="hidden">Внутрь</button><button id="tZap" class="hidden">Разряд</button><button id="tDash">Рывок</button><button id="tEdit">Эволюция</button></div>
 
 <div id="start" class="modal"><div class="box" style="max-width:560px">
  <h1>Эволюция · Уровень 1</h1>
@@ -198,6 +198,10 @@ const NODES=[
  {id:'phago',ru:'Фагоцитоз',grp:'Трофеи боссов',rare:1,trophy:1,cost:0,req:[],desc:'Наследство гигантской амёбы: глотаешь добычу почти своего размера (до 90%).'},
  {id:'mastax',ru:'Мастакс',grp:'Трофеи боссов',rare:1,trophy:1,cost:0,req:[],desc:'Челюсти хищной коловратки: каждая клетка на краю тела слабо кусает тех, кого касается.'},
  {id:'nemabat',ru:'Батарея нематоцист',grp:'Трофеи боссов',rare:1,trophy:1,cost:0,req:[],desc:'Наследство старой гидры: стрекательные нити летят дальше и вдвое чаще, а ядро умеет стрелять само.'},
+ {id:'parasite',ru:'Проникновение',grp:'Паразитизм',cost:7,req:[],desc:'Путь паразита: нажми R рядом с существом крупнее тебя, чтобы проникнуть внутрь и есть его изнутри. Внутри хищники тебя не видят. Хозяин может быть до уровня «сила хищника + 3».'},
+ {id:'hooks',ru:'Крючья',grp:'Паразитизм',cost:8,req:['parasite'],desc:'Цепляешься изнутри: иммунитет хозяина выталкивает тебя вдвое реже.'},
+ {id:'stealthP',ru:'Иммунная маскировка',grp:'Паразитизм',cost:10,req:['hooks'],desc:'Хозяин не замечает тебя: высасываешь в 1.5 раза больше, а выталкивает он ещё вдвое реже.'},
+ {id:'puppet',ru:'Управление хозяином',grp:'Паразитизм',cost:14,req:['stealthP'],desc:'Как гриб-кордицепс: внутри хозяина ты управляешь его движением.'},
  {id:'spec',ru:'Специализация клеток',grp:'Специализация',cost:10,req:['adhesion'],minCells:6,desc:'Клетки делят работу. Шаг от колонии к настоящему многоклеточному. Открывает три новых типа клеток.'},
  {id:'nerve',ru:'Нервная клетка',grp:'Специализация',cost:8,req:['spec'],unlock:'nerve',desc:'Связывает клетки в сеть: +12% к скорости и повороту за каждую (до 3).'},
  {id:'muscle',ru:'Мышечная клетка',grp:'Специализация',cost:8,req:['spec'],unlock:'muscle',desc:'Сокращается: сильная тяга, тело плывёт волной.'},
@@ -213,6 +217,33 @@ const TIER_RU=['','крошечные','мелкие','средние','круп
 function edibleList(lv){return Object.keys(TIER).filter(k=>TIER[k]===lv&&SP[k]&&!SP[k].notSpecies).map(k=>SP[k].ru);}
 function dnaDim(sp){const k=P.killed[sp]||1;return Math.max(0.3,1/(1+0.15*(k-1)));}
 for(const n of NODES)if(ATK_NODES.includes(n.id)||['pseudo','spike','mouth','sting'].includes(n.id))n.desc+=' <b>+1 к силе хищника</b>'+(ATK_CELLS.includes(n.id)?' (если клетка есть в теле)':'')+'.';
+let DAYK=1,host=null;const DAY_LEN=300;
+function calcDay(){const t=((P.stats&&P.stats.time)||0)%DAY_LEN;DAYK=t<200?1:t<220?1-(t-200)/20*0.88:t<280?0.12:0.12+(t-280)/20*0.88;const nt=DAYK<0.5;if(nt!==!!P.nightNow){P.nightNow=nt;if(started&&P.stats.time>5)toast(nt?'<b>Ночь.</b> Солнце над прудом село: фотосинтез почти остановился, хищники охотятся смелее и быстрее. Зато в воде вспыхивают ночесветки — светящаяся еда.':'<b>Рассвет.</b> Свет вернулся — водоросли снова кормят тех, у кого есть хлоропласты.');}}
+function isNight(){return DAYK<0.5;}
+/* ранения: хищник может оторвать клетку с края тела */
+function woundCell(w,a){if(!w||!w.edge||w.core||D.n<4||P.inv>0||host)return;const key=w.q+','+w.r;P.cdmg=P.cdmg||{};P.cdmg[key]=(P.cdmg[key]||0)+a;const thr=TYPES[w.t].hp*2.2*(w.t==='armor'?2:1);if(P.cdmg[key]>=thr){delete P.cdmg[key];biteOff(w);}}
+function connectedWithout(q,r){const rest=P.cells.filter(c=>!(c.q===q&&c.r===r));if(!rest.length)return false;const set=new Set(rest.map(c=>c.q+','+c.r));const seen=new Set([rest[0].q+','+rest[0].r]);const st=[rest[0]];while(st.length){const c=st.pop();for(const[dq,dr]of HDIR){const k=(c.q+dq)+','+(c.r+dr);if(set.has(k)&&!seen.has(k)){seen.add(k);st.push({q:c.q+dq,r:c.r+dr});}}}return seen.size===rest.length;}
+function biteOff(w){if(!connectedWithout(w.q,w.r))return;const i=P.cells.findIndex(c=>c.q===w.q&&c.r===w.r);if(i<=0)return;const c=P.cells.splice(i,1)[0];const tm=hasN('regen')?10:24;P.lost=P.lost||[];P.lost.push({q:c.q,r:c.r,t:c.t,time:tm,max:tm});
+ spawnFood(w.wx,w.wy,'detritus',3);derive();P.hurt=0.5;pop(w.wx,w.wy,'Клетка оторвана!','#ff8a7a');
+ if(!P.hintsDone.wound){P.hintsDone.wound=1;toast('<b>Хищник оторвал клетку!</b> Она отрастёт через '+tm+' с, если ты сыт. Ценные клетки прячь в центр тела, а по краям ставь оболочку — её оторвать вдвое труднее.');}}
+function regrowTick(dt){if(P.cdmg)for(const k in P.cdmg){P.cdmg[k]-=dt*0.6;if(P.cdmg[k]<=0)delete P.cdmg[k];}
+ if(!P.lost||!P.lost.length)return;for(const L of P.lost){if((P.sat||0)>0.15)L.time-=dt;}const set=new Set(P.cells.map(c=>c.q+','+c.r));let ch=false;
+ P.lost=P.lost.filter(L=>{if(L.time>0)return true;if(set.has(L.q+','+L.r))return false;const nb=HDIR.some(([dq,dr])=>set.has((L.q+dq)+','+(L.r+dr)));if(!nb)return true;P.cells.push({q:L.q,r:L.r,t:L.t});set.add(L.q+','+L.r);ch=true;return false;});
+ if(ch){derive();pop(P.x,P.y-D.R-8,'Клетка отросла','#9fe0a0');}}
+function restoreLost(){if(!P.lost||!P.lost.length)return;const set=new Set(P.cells.map(c=>c.q+','+c.r));for(const L of P.lost)if(!set.has(L.q+','+L.r)){P.cells.push({q:L.q,r:L.r,t:L.t});set.add(L.q+','+L.r);}P.lost=[];derive();}
+/* паразитизм */
+function hostOk(e){const s=SP[e.sp];return s&&!s.kind&&!e.boss&&!e.rival&&!e.ally&&e.sp!=='cyclops'&&e.sp!=='daphnia'&&e.sp!=='egg'&&!e.dead&&!e.eaten&&e.r>D.R*1.2&&tierOf(e)<=D.pl+3;}
+function tryInfest(){if(!started||paused||editorOpen)return;if(host){leaveHost(false,true);return;}if(!hasN('parasite'))return;
+ let best=null,bd=1e9;for(const e of ents){if(!hostOk(e))continue;const d=Math.hypot(e.x-P.x,e.y-P.y)-e.r-D.R;if(d<25&&d<bd){bd=d;best=e;}}
+ if(!best){toast('Рядом нет подходящего хозяина: нужно существо крупнее тебя, не выше уровня '+(D.pl+3)+'. Подплыви вплотную.');return;}
+ host=best;best.infested=true;P.hostT=0;toast('Ты внутри: <b>'+SP[best.sp].ru+'</b>. Питаешься им изнутри, хищники тебя не видят. R — выйти.');}
+function leaveHost(dead,manual){const e=host;host=null;if(!e)return;e.infested=false;const a=rnd(0,TAU);P.x=e.x+Math.cos(a)*(e.r+D.R+4);P.y=e.y+Math.sin(a)*(e.r+D.R+4);P.vx=Math.cos(a)*60;P.vy=Math.sin(a)*60;P.inv=Math.max(P.inv,1.2);
+ if(dead)toast('Хозяин истощён и погиб — ты выбираешься наружу сытым.');else if(!manual)toast('Иммунитет хозяина вытолкнул тебя наружу!');}
+function hostTick(dt){const e=host;if(!e||e.dead||e.eaten){if(e&&e.dead)leaveHost(true);else{host=null;}return;}
+ P.x=e.x;P.y=e.y;P.vx=e.vx||0;P.vy=e.vy||0;const s=SP[e.sp];P.hostT+=dt;
+ const drain=(2+tierOf(e)*1.4)*(hasN('stealthP')?1.5:1)*dt;e.hp-=drain*(hasN('stealthP')?0.7:1);gain(drain*s.food/(e.maxHp||s.hp)*0.9);P.sat=Math.min(1,P.sat+drain*0.004);
+ if(e.hp<=0){killEnt(e);leaveHost(true);return;}
+ const ex=0.06*(hasN('hooks')?0.5:1)*(hasN('stealthP')?0.5:1);if(P.hostT>3&&R_()<ex*dt){hurt(D.hpMax*0.08,null);leaveHost(false);}}
 function giveDna(e,base){if(!base)return;const v=base*dnaDim(e.sp);P.dnaF=(P.dnaF||0)+v;let got=0;while(P.dnaF>=1){P.dnaF-=1;P.dna++;got++;}if(got)pop(e.x,e.y,'+'+got+' ДНК','#ffd47a');}
 /* виды: r — радиус столкновения в мкм */
 const SP={
@@ -233,6 +264,7 @@ const SP={
  hydra:{ru:'Гидра',r:[90,120],hp:150,food:60,dna:8,spd:0,turn:0,beh:'hydra',dmg:6,real:1,info:'Пресноводный полип, родственник медуз. Сидит на месте, щупальца со стрекательными клетками ловят всё, что коснётся. Сбоку видна почка — так гидра размножается.'},
  nematode:{ru:'Нематода',r:[50,70],hp:40,food:30,dna:4,spd:42,turn:2.5,beh:'worm',real:1,info:'Круглый червь: извивается волной и ест бактерии. Безобидна, а для охотника — сытная добыча.'},
  cyclops:{ru:'Циклоп',r:[520,600],hp:4000,food:300,dna:30,spd:55,turn:0.8,beh:'cyclops',dmg:15,real:1,info:'Веслоногий рачок с одним глазом. Для жителей капли — огромное чудовище, которое ест всех подряд. Прячься!'},
+ noct:{ru:'Ночесветка',kind:'food',r:[4,6],hp:1,food:2.2,dna:0,spd:4,real:1,info:'Светящаяся водоросль-динофлагеллята. Ночью вспыхивает голубым светом — по ней легко найти еду в темноте.'},
  phage:{ru:'Бактериофаг',kind:'virus',r:[1.3,1.7],hp:1,food:0.05,dna:0,spd:16,real:1,notSpecies:1,info:'Вирус, который заражает только бактерий: впрыскивает в них свою ДНК, и бактерия лопается, выпуская новые фаги. Тебе он не опасен.'},
  vorticella:{ru:'Сувойка',r:[9,12],hp:5,food:4,dna:1,spd:0,turn:0,beh:'vort',real:1,info:'Инфузория-колокольчик на длинном стебельке. Если потревожить, стебелёк мгновенно скручивается пружиной — одно из самых быстрых движений в природе.'},
  daphnia:{ru:'Дафния',r:[650,750],hp:5000,food:350,dna:35,spd:40,turn:0.6,beh:'daphnia',dmg:10,real:1,info:'Водяная блоха — рачок с прозрачным панцирем и огромным глазом. Ножками фильтрует воду и затягивает всё мелкое. Внутри видно сердце и яйца.'},
@@ -316,7 +348,8 @@ function updateCellWorld(){const ca=Math.cos(P.a),sa=Math.sin(P.a);for(const w o
 
 /* ========== мир ========== */
 function flow(x,y){return[Math.sin(y*0.0021+T*0.13)*7+Math.sin((x+y)*0.0013-T*0.07)*5,Math.cos(x*0.0018-T*0.11)*7+Math.sin((x-y)*0.0011+T*0.05)*4];}
-function lightAt(x,y){let L=0.15+0.2*surfAt(x,y);for(const l of lights){const d2=((x-l.x)**2+(y-l.y)**2)/(l.r*l.r);if(d2<1)L=Math.max(L,0.15+0.85*(1-d2)*(1-d2));}return L*(1-0.65*siltAt(x,y))*(inThicket(x,y)?0.8:1);}
+function lightAt(x,y){return lightAt0(x,y)*(0.12+0.88*DAYK);}
+function lightAt0(x,y){let L=0.15+0.2*surfAt(x,y);for(const l of lights){const d2=((x-l.x)**2+(y-l.y)**2)/(l.r*l.r);if(d2<1)L=Math.max(L,0.15+0.85*(1-d2)*(1-d2));}return L*(1-0.65*siltAt(x,y))*(inThicket(x,y)?0.8:1);}
 function initWorld(){
  lights=[];let lt=0;while(lights.length<22&&lt++<400){const a=rnd(0,TAU),d=Math.sqrt(R_())*DROP_R*0.92;const x=Math.cos(a)*d,y=Math.sin(a)*d;const z=zoneZ(x,y);if(z>0.6||(z>0.45&&R_()<0.6))continue;lights.push({x,y,r:rnd(350,900)*(z<0.36?1.3:1),vx:rnd(-3,3),vy:rnd(-3,3)});}
  lights[0].x=120;lights[0].y=-60;lights[0].r=420;
@@ -490,6 +523,7 @@ function fillWorld(all){
   if(k==='vorticella'){const n=3+((R_()*4)|0),a0=rnd(0,TAU);for(let i=0;i<n;i++){const v=spawnEnt(k,x,y);v.ax=x;v.ay=y;v.sa=a0+(i-(n-1)/2)*0.38+rnd(-0.1,0.1);v.len=rnd(55,95);v.coil=0;}org+=n;}
   else if(k==='paramecium'){const gid=++grpId,n=3+((R_()*4)|0),a0=rnd(0,TAU);for(let i=0;i<n;i++){const e2=spawnEnt(k,x+rnd(-90,90),y+rnd(-90,90));e2.grp=gid;e2.a=e2.wa=a0+rnd(-0.3,0.3);}org+=n;}
   else{spawnEnt(k,x,y);org++;}}
+ const noc=ents.reduce((n,e)=>n+(e.sp==='noct'&&!e.eaten?1:0),0);if(DAYK<0.6&&noc<30&&R_()<0.5){const[x,y]=spawnPos(0.4,1.2);for(let i=0;i<3;i++)spawnEnt('noct',x+rnd(-40,40),y+rnd(-40,40));}
  if(vir<10&&R_()<(all?1:0.05)){const bs=ents.filter(e=>(e.sp==='coccus'||e.sp==='bacil')&&Math.hypot(e.x-P.x,e.y-P.y)>scrDiag()*(all?0.3:1.05));const b0=bs.length?pick(bs):null;if(b0)for(let i=0;i<4;i++)spawnEnt('phage',b0.x+rnd(-30,30),b0.y+rnd(-30,30));}
  if(plas<(hasN('adhesion')?3:4)&&R_()<(all?1:(hasN('adhesion')?0.02:0.03))){const[x,y]=spawnPos(all?0.3:(hasN('adhesion')?0.8:0.55),hasN('adhesion')?1.3:1.05);spawnFood(x,y,'plasmid',1);}
 }
@@ -504,6 +538,7 @@ addEventListener('keydown',e=>{
  if(e.code==='KeyE'&&!setOpen){toggleEditor();e.preventDefault();}
  if(e.code==='Space'){doDash();e.preventDefault();}
  if(e.code==='KeyQ'){doZap();}
+ if(e.code==='KeyR'){tryInfest();}
  if(e.code==='KeyP'||e.code==='Escape'){if(pendingMut)return;if(achOpen)toggleAch();else if(setOpen)toggleSettings();else if(editorOpen)toggleEditor();else if(started)setPause(!paused);}
  const mi=['Digit1','Digit2','Digit3','Digit4'].indexOf(e.code);if(mi>=0&&!editorOpen)setMode(MODE_KEYS[mi]);
 });
@@ -527,13 +562,15 @@ function doDash(){if(!started||paused||!D.dashCd||P.dashCd>0)return;P.dashT=0.35
 
 /* ========== игрок ========== */
 function updatePlayer(dt){
- const[dx,dy,thr]=inputDir();
+ calcDay();regrowTick(dt);
+ if(host)hostTick(dt);
+ const[dx,dy,thr]=host?[0,0,0]:inputDir();
  if(thr>0){const da=Math.atan2(dy,dx);let diff=((da-P.a+Math.PI*3)%TAU)-Math.PI;const mt=D.turn*dt;P.a+=clamp(diff,-mt,mt);}
  const fx=Math.cos(P.a),fy=Math.sin(P.a);
  let face=1;if(thr>0){const da=Math.atan2(dy,dx);face=Math.max(0.2,Math.cos(((da-P.a+Math.PI*3)%TAU)-Math.PI));}
  let tv=D.speed*thr*face*(P.starving?0.7:1);if(P.dashT>0){P.dashT-=dt;tv=Math.max(tv,D.speed)*3.2;}
  const k=Math.min(1,dt*9);P.vx+=(fx*tv-P.vx)*k;P.vy+=(fy*tv-P.vy)*k;
- const fl=flow(P.x,P.y);P.x+=(P.vx+fl[0]*0.6)*dt;P.y+=(P.vy+fl[1]*0.6)*dt;
+ const fl=flow(P.x,P.y);if(!host){P.x+=(P.vx+fl[0]*0.6)*dt;P.y+=(P.vy+fl[1]*0.6)*dt;}
  const dc=Math.hypot(P.x,P.y);if(dc>DROP_R-D.R){P.x*=(DROP_R-D.R)/dc;P.y*=(DROP_R-D.R)/dc;}
  if(P.dashCd>0)P.dashCd-=dt;if(P.inv>0)P.inv-=dt;if(P.hurt>0)P.hurt-=dt;P.lastHit+=dt;
  if(D.photo){const g=D.photo*lightAt(P.x,P.y)*dt;gain(g,true);}
@@ -566,9 +603,9 @@ function fireSting(){
  P.stingCd=1.6/Math.max(1,D.sting*0.7)/(hasN('nemabat')?2:1);
  if(best.hp<=0)killEnt(best);
 }
-function hurt(amount,cellT){
- if(P.inv>0)return;
- const mult=cellT==='armor'?0.5:1;P.hp-=amount*mult;P.hurt=0.25;P.lastHit=0;
+function hurt(amount,c){
+ if(P.inv>0)return;const cellT=c&&typeof c==='object'?c.t:c;
+ const mult=cellT==='armor'?0.5:1;P.hp-=amount*mult;P.hurt=0.25;P.lastHit=0;if(c&&typeof c==='object')woundCell(c,amount*mult);
  if(P.hp<=0&&hasN('cystn')&&P.cystCd<=0){P.hp=D.hpMax*0.3;P.inv=3;P.cystCd=120;toast('<b>Циста!</b> Тело свернулось в прочную оболочку и выжило. Следующий раз — через 2 минуты.');return;}
  if(P.hp<=0)playerDie();
 }
@@ -652,15 +689,15 @@ function updateEnts(dt){
   }
   if(e.conj){const c=e.conj,o=c.p;c.t-=dt;if(!o||o.dead||o.eaten||!o.conj||c.t<=0||(e.fleeT>0)){if(c.lead&&c.t<=0)lifePop(e,'Обмен генами завершён');e.conj=null;if(o&&o.conj&&o.conj.p===e)o.conj=null;e.wa=e.a+(c.lead?0.7:-0.7);e.r*=rnd(0.97,1.03);}
    else if(!c.lead){const L=o;e.a=L.a;const px=-Math.sin(L.a),py=Math.cos(L.a);e.x+=(L.x+px*L.r*0.66-e.x)*Math.min(1,dt*4);e.y+=(L.y+py*L.r*0.66-e.y)*Math.min(1,dt*4);e.vx=L.vx;e.vy=L.vy;e.spin=L.spin;continue;}}
-  let spd=s.spd*slow,wantA=null;
+  let spd=s.spd*slow*(DAYK<0.5&&(s.beh==='hunt'||s.beh==='rotifer')?1.25:1)*(DAYK<0.5&&s.beh==='photo'?0.4:1),wantA=null;
   // поведение
   let flee=(s.flee||(s.beh==='hunt'&&tierOf(e)<=D.pl&&D.pl>0))&&dP<e.r*5+pR*2&&tierOf(e)<=D.pl&&D.pl>0&&!(e.sp==='euglena'&&(e.bond>0||Math.hypot(P.vx,P.vy)<D.speed*0.45));
   if(flee||(e.aggro>0&&e.grp))e.fleeT=1.5;else if(e.fleeT>0)e.fleeT-=dt;
   if(!flee&&e.grp&&GRP[e.grp]&&GRP[e.grp].alarm&&dP<900)flee=true;
   if(s.beh==='hunt'||s.beh==='rotifer'){
    e.tgT-=dt;
-   if(e.tgT<=0){e.tgT=0.5;e.tg=null;let bd=e.r*7+150;
-    const pTarget=!s.preyOnly&&s.beh!=='rotifer'&&P.inv<=0&&tierOf(e)>D.pl&&dP<bd&&!(hasN('lumin')&&e.r<pR*2.5);
+   if(e.tgT<=0){e.tgT=0.5;e.tg=null;let bd=(e.r*7+150)*(DAYK<0.5?1.35:1);
+    const pTarget=!host&&!s.preyOnly&&s.beh!=='rotifer'&&P.inv<=0&&tierOf(e)>D.pl&&dP<bd&&!(hasN('lumin')&&e.r<pR*2.5);
     if(pTarget){e.tg='P';bd=dP;}
     for(const o of ents){if(o===e||o.eaten||o.dead)continue;const os=SP[o.sp];if(!os||os.kind==='food'||os.kind==='virus'||os.kind==='rival')continue;if(s.preyOnly?o.sp!==s.preyOnly:(s.beh==='rotifer'?(o.r>e.r*0.3||o.sp==='egg'):o.r>e.r/1.4))continue;const d=Math.hypot(o.x-e.x,o.y-e.y);if(d<bd){bd=d;e.tg=o;}}
    }
@@ -724,6 +761,7 @@ function updateEnts(dt){
   if(e.aggro>0&&s.flee){spd=s.spd*1.2;}
   if(cycE&&cycE!==e&&cycE.life>0&&s.spd>0&&s.beh!=='cyclops'){const dc=Math.hypot(e.x-cycE.x,e.y-cycE.y);if(dc<1100){wantA=Math.atan2(e.y-cycE.y,e.x-cycE.x);spd=s.spd*1.3*slow;}}
   if(e.sp==='paramecium'&&e.aggro>0&&dP<e.r+pR+50){e.tri=(e.tri||0)-dt;if(e.tri<=0){e.tri=2.5;const ba=Math.atan2(P.y-e.y,P.x-e.x);for(let k=0;k<8;k++){const a=ba+rnd(-0.6,0.6);shots.push({x1:e.x+Math.cos(a)*e.r*0.4,y1:e.y+Math.sin(a)*e.r*0.3,x2:e.x+Math.cos(a)*(e.r*0.4+70),y2:e.y+Math.sin(a)*(e.r*0.3+70),t:0.35,c:'tri'});}if(P.inv<=0){deathCause='трихоцисты туфельки';hurt(4,null);}lifePop(e,'Трихоцисты!');}}
+  if(e===host&&hasN('puppet')){const[ix,iy,th]=inputDir();if(th>0){wantA=Math.atan2(iy,ix);spd=Math.max(spd,(s.spd||20)*1.1)*th;}else spd*=0.15;e.tg=null;e.fleeT=0;}
   if(wantA!==null)steer(e,wantA,dt,s.turn||1);
   if(Math.hypot(e.x,e.y)>DROP_R*0.97){e.wa=Math.atan2(-e.y,-e.x);}
   if(e.div)spd*=0.15;if(e.conj)spd*=0.35;
@@ -746,7 +784,7 @@ function updateEnts(dt){
  ents=ents.filter(e=>!(e.eaten>=1)&&!e.dead);
 }
 /* столкновения игрока */
-function collide(dt){
+function collide(dt){if(host)return;
  const pR=D.R;
  if(thickets.some(t=>Math.hypot(P.x-t.x,P.y-t.y)<t.r*1.1+pR)){let sx=0,sy=0,n=0;for(const w of D.cw){const[px,py]=filPush(w.wx,w.wy,CELL_R*0.95);if(px||py){sx+=px;sy+=py;n++;}}if(n){P.x+=sx/n;P.y+=sy/n;const vl=Math.hypot(sx,sy)||1;const dot=(P.vx*sx+P.vy*sy)/vl;if(dot<0){P.vx-=sx/vl*dot;P.vy-=sy/vl*dot;}}}
  for(const e of ents){
@@ -762,7 +800,7 @@ function collide(dt){
   // организм
   if(e.r<=pR*D.engulf&&e.sp!=='cyclops'&&tierOf(e)<=D.pl){eatEnt(e);continue;}
   const weak=tierOf(e)>D.pl?0.12:1;if(weak<1&&!P.hintsDone['tier'+tierOf(e)]&&(D.edge.spike||D.edge.mouth)){P.hintsDone['tier'+tierOf(e)]=1;toast('<b>'+SP[e.sp].ru+'</b> тебе пока не по зубам: это существо уровня '+tierOf(e)+', а твоя сила хищника — '+D.pl+'. Купи ещё атакующий орган.');}
-  if(e.sp==='diatom'&&!hasN('jaws')&&P.inv<=0&&Math.hypot(P.vx,P.vy)>D.speed*0.3){deathCause='порезался о диатомею';hurt(2.5*dt,cw.t);}
+  if(e.sp==='diatom'&&!hasN('jaws')&&P.inv<=0&&Math.hypot(P.vx,P.vy)>D.speed*0.3){deathCause='порезался о диатомею';hurt(2.5*dt,cw);}
   // атаки игрока
   let attacked=false;
   for(const w of D.cw){if(!w.edge)continue;if(w.t!=='spike'&&w.t!=='mouth')continue;const d=Math.hypot(w.wx-e.x,w.wy-e.y);if(d>CELL_R*1.6+e.r)continue;
@@ -771,9 +809,9 @@ function collide(dt){
   if(hasN('mastax')){let k=0;for(const w of D.cw){if(!w.edge||k>=3)continue;if(Math.hypot(w.wx-e.x,w.wy-e.y)<CELL_R*1.3+e.r){k++;const dm=2.5*dt*weak;e.hp-=dm;gain(dm*s.food/s.hp*0.4);attacked=true;}}}
   if(attacked){e.aggro=2;if(e.hp<=0){killEnt(e);continue;}}
   // урон игроку
-  if(s.beh==='amoeba'&&pR<e.r*0.6){deathCause='переварен амёбой';hurt((s.edmg||7)*dt*(1-0.4*D.armorFrac),cw.t);P.x+=(e.x-P.x)*dt*0.8;P.y+=(e.y-P.y)*dt*0.8;continue;}
+  if(s.beh==='amoeba'&&pR<e.r*0.6){deathCause='переварен амёбой';hurt((s.edmg||7)*dt*(1-0.4*D.armorFrac),cw);P.x+=(e.x-P.x)*dt*0.8;P.y+=(e.y-P.y)*dt*0.8;continue;}
   let rotBite=false;if(s.beh==='rotifer'&&pR<e.r*0.6){const hx=e.x+Math.cos(e.a)*e.r*0.8,hy=e.y+Math.sin(e.a)*e.r*0.8;rotBite=Math.hypot(hx-P.x,hy-P.y)<pR+e.r*0.4;}
-  if(s.dmg&&(s.sting||(s.beh==='hunt'&&e.tg==='P')||rotBite||(tierOf(e)>D.pl&&e.aggro>0))){deathCause='атака: '+s.ru.toLowerCase();hurt(s.dmg*dt*(tierOf(e)>D.pl?1:0.3),cw.t);}
+  if(s.dmg&&(s.sting||(s.beh==='hunt'&&e.tg==='P')||rotBite||(tierOf(e)>D.pl&&e.aggro>0))){deathCause='атака: '+s.ru.toLowerCase();hurt(s.dmg*dt*(tierOf(e)>D.pl?1:0.3),cw);}
   // расталкивание
   const nx=(e.x-cw.wx)/(cd||1),ny=(e.y-cw.wy)/(cd||1);const mP=D.n,mE=(e.r/10)**2;const tot=mP+mE;
   const push=Math.min(ov,6);if(s.beh!=='vort'){e.x+=nx*push*(mP/tot);e.y+=ny*push*(mP/tot);}if(s.beh!=='sessile'){}P.x-=nx*push*(mE/tot);P.y-=ny*push*(mE/tot);
@@ -847,6 +885,7 @@ function drawSpore(s){
 const DRAW={
  coccus(e,t){const r=e.r*(e.inf>0?1+0.35*(1-e.inf/3):1);if(e.inf>0){ctx.strokeStyle=P.mode==='fluo'?'rgba(255,120,220,0.8)':ST.eye(0.6);ctx.lineWidth=PX;circ(0,0,r*2.2);ctx.stroke();}ctx.fillStyle=ST.gran(1);for(let i=0;i<e.n;i++){const a=i*2.1+e.seed*6;const d=i?r*1.7:0;circ(Math.cos(a)*d,Math.sin(a)*d,r);ctx.fill();}},
  bacil(e,t){const r=e.r*(e.inf>0?1+0.35*(1-e.inf/3):1);if(e.inf>0){ctx.strokeStyle=P.mode==='fluo'?'rgba(255,120,220,0.8)':ST.eye(0.6);ctx.lineWidth=PX;ell(0,0,r*2.6,r*1.6);ctx.stroke();}ctx.fillStyle=ST.gran(0.9);ctx.beginPath();ctx.roundRect?ctx.roundRect(-r*2,-r,r*4,r*2,r):ell(0,0,r*2,r);ctx.fill();if(ST.glow){ctx.strokeStyle=ST.mem(0.4);ctx.lineWidth=PX;ctx.stroke();}},
+ noct(e,t){const r=e.r;ctx.fillStyle=ST.dark?'rgba(150,210,240,0.35)':'rgba(120,170,200,0.35)';circ(0,0,r);ctx.fill();ctx.strokeStyle=ST.dark?'rgba(180,230,255,0.7)':'rgba(70,110,140,0.6)';ctx.lineWidth=PX*0.9;ctx.stroke();ctx.fillStyle=ST.dark?'rgba(110,220,255,0.8)':'rgba(40,120,170,0.7)';circ(r*0.2,-r*0.15,r*0.3);ctx.fill();ctx.strokeStyle=ST.dark?'rgba(200,230,255,0.5)':'rgba(60,80,90,0.5)';ctx.beginPath();ctx.moveTo(-r,0);ctx.quadraticCurveTo(-r*1.6,Math.sin(t*8)*r*0.5,-r*2.1,0);ctx.stroke();},
  chlorella(e,t){const r=e.r;ctx.fillStyle=ST.cyto(110,1.5);circ(0,0,r);ctx.fill();ctx.fillStyle=ST.chlo(0.9);ctx.beginPath();ctx.arc(0,0,r*0.85,0.6,TAU-0.6);ctx.arc(0,0,r*0.45,TAU-0.6,0.6,true);ctx.fill();mem(()=>circ(0,0,r),e.x,e.y,e.a,0.7);},
  plasmid(e,t){const r=e.r,p=1+0.15*Math.sin(t*4);const hg=ctx.createRadialGradient(0,0,r*0.5,0,0,r*4.5);hg.addColorStop(0,`rgba(255,215,90,${0.28+0.12*Math.sin(t*3)})`);hg.addColorStop(1,'rgba(255,215,90,0)');ctx.fillStyle=hg;circ(0,0,r*4.5);ctx.fill();ctx.strokeStyle=ST.glow?'rgba(255,220,110,0.95)':'rgba(150,90,10,0.9)';ctx.lineWidth=PX*1.4;circ(0,0,r*p);ctx.stroke();circ(0,0,r*0.6*p);ctx.stroke();ctx.fillStyle=ST.glow?'rgba(255,220,110,0.5)':'rgba(190,120,20,0.4)';circ(0,0,r*0.3);ctx.fill();},
  detritus(e,t){const r=e.r;ctx.fillStyle=ST.glow?'rgba(210,180,140,0.35)':'rgba(110,85,50,0.45)';blobPath(r,e.seed,0,0.35,3);ctx.fill();ctx.fillStyle=ST.gran(0.6);granules(4,r*0.6,e.seed,0,ST.gran(0.6),r*0.3);},
@@ -1174,6 +1213,7 @@ function drawWorld(){
   else f(e,T);
   if(e.conj&&e.conj.lead){const r=e.r;ctx.strokeStyle=ST.nucRim(0.8);ctx.lineWidth=PX*1.2;ctx.beginPath();for(let k=-3;k<=3;k++){const x=k*r*0.07;ctx.moveTo(x,r*0.22);ctx.lineTo(x+Math.sin(T*6+k)*r*0.02,r*0.44);}ctx.stroke();ctx.fillStyle=ST.nuc(1.6);circ(Math.sin(T*1.5)*r*0.12,r*0.33,r*0.04);ctx.fill();}
   if(e.bond>0){ctx.strokeStyle='rgba(255,210,90,0.9)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(0,0,e.r*1.25,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,e.bond/3));ctx.stroke();}
+  if(e.infested){ctx.strokeStyle=`rgba(190,80,230,${0.5+0.3*Math.sin(T*4)})`;ctx.lineWidth=2*PX;ctx.setLineDash([2*PX,4*PX]);circ(0,0,e.r*1.08);ctx.stroke();ctx.setLineDash([]);}
   if(e.ally){ctx.strokeStyle='rgba(255,210,90,0.55)';ctx.lineWidth=1.2*PX;ctx.setLineDash([3*PX,3*PX]);circ(0,0,e.r*1.2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.globalAlpha=1;
   if((e.hitT>0||e.boss||e.rival)&&e.maxHp>0&&SP[e.sp]&&SP[e.sp].kind!=='food')hpBar(e);
@@ -1182,7 +1222,9 @@ function drawWorld(){
  if(hasN('lumin')){const gl=ctx.createRadialGradient(P.x,P.y,D.R*0.5,P.x,P.y,D.R*2.2);const pa=0.5+0.5*Math.sin(T*2);gl.addColorStop(0,ST.dark?`rgba(120,220,255,${0.18+0.1*pa})`:`rgba(120,200,255,${0.12+0.06*pa})`);gl.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gl;circ(P.x,P.y,D.R*2.2);ctx.fill();}
  // игрок
  ctx.save();ctx.translate(P.x,P.y);ctx.rotate(P.a);
- const flick=P.inv>0?0.55+0.45*Math.sin(T*20):1;BS=playerBS();drawBody(D.cw,T,P.x,P.y,P.a,flick);
+ const flick=host?0.4:P.inv>0?0.55+0.45*Math.sin(T*20):1;BS=playerBS();drawBody(D.cw,T,P.x,P.y,P.a,flick);
+ if(P.cdmg)for(const w of D.cw){const d=P.cdmg[w.q+','+w.r];if(!d)continue;const k=clamp(d/(TYPES[w.t].hp*2.2*(w.t==='armor'?2:1)),0,1);ctx.strokeStyle=`rgba(255,60,50,${0.25+0.6*k})`;ctx.lineWidth=(1+2*k)*PX;ctx.beginPath();ctx.arc(w.bx,w.by,CELL_R*0.75,0,TAU*k);ctx.stroke();}
+ if(P.lost&&P.lost.length)for(const L of P.lost){const[hx,hy]=hexXY(L.q,L.r);const bx=hx-D.mx,by=hy-D.my;ctx.setLineDash([3*PX,3*PX]);ctx.strokeStyle=ST.dark?'rgba(200,230,255,0.45)':'rgba(60,60,50,0.45)';ctx.lineWidth=1.2*PX;circ(bx,by,CELL_R*0.9);ctx.stroke();ctx.setLineDash([]);ctx.strokeStyle='rgba(120,220,140,0.8)';ctx.lineWidth=2*PX;ctx.beginPath();ctx.arc(bx,by,CELL_R*0.9,-Math.PI/2,-Math.PI/2+TAU*(1-L.time/L.max));ctx.stroke();}
  if(P.hurt>0){ctx.strokeStyle=`rgba(255,40,40,${P.hurt*2})`;ctx.lineWidth=3*PX;circ(0,0,D.R+3);ctx.stroke();}
  ctx.restore();
  ctx.globalCompositeOperation='source-over';
@@ -1191,6 +1233,8 @@ function drawWorld(){
 }
 function drawOverlay(){
  ctx.setTransform(DPR,0,0,DPR,0,0);
+ if(DAYK<0.995){ctx.fillStyle=`rgba(4,8,32,${(1-DAYK)*(ST.dark?0.32:0.45)})`;ctx.fillRect(0,0,W,H);
+  if(DAYK<0.7){ctx.save();ctx.globalCompositeOperation='lighter';const nk=(0.7-DAYK)/0.58;for(const e of ents){if(e.eaten||e.dead)continue;let gr=0,col='';if(e.sp==='noct'){gr=e.r*2.6;col='90,200,255';}else if(e.sp==='bell'){gr=e.r*1.6;col='160,120,255';}else if(e.sp==='plasmid'){gr=e.r*5;col='255,210,90';}if(!gr)continue;const sx=(e.x-cam.x)*cam.s+W/2,sy=(e.y-cam.y)*cam.s+H/2,R0=gr*cam.s;if(sx<-R0||sx>W+R0||sy<-R0||sy>H+R0)continue;const a=nk*(0.3+0.2*Math.sin(T*3+e.seed*9))*(e.sp==='noct'&&Math.hypot(e.vx||0,e.vy||0)>3?1.6:1);const g=ctx.createRadialGradient(sx,sy,0,sx,sy,R0);g.addColorStop(0,`rgba(${col},${a})`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.fillRect(sx-R0,sy-R0,R0*2,R0*2);}ctx.restore();}}
  if(FX.vig){const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35,W/2,H/2,Math.hypot(W,H)*0.55);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,ST.vig);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
  // цветная кайма по краю поля
  if(FX.ca){const r0=Math.min(W,H)*0.48,rg=ctx.createRadialGradient(W/2,H/2,r0,W/2,H/2,Math.hypot(W,H)*0.55);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(0.35,ST.dark?'rgba(80,40,255,0.07)':'rgba(255,60,0,0.06)');rg.addColorStop(0.7,ST.dark?'rgba(255,60,40,0.06)':'rgba(0,80,255,0.05)');rg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=rg;ctx.fillRect(0,0,W,H);}
@@ -1246,9 +1290,9 @@ function hud(){
  $('cellTxt').textContent=D.n;if($('plTxt'))$('plTxt').textContent=D.pl;$('dnaTxt').textContent=P.dna;
  const dk=Object.keys(P.defects);$('defTxt').innerHTML=dk.length?'Дефект: '+dk.map(k=>DEFECTS[k].ru+' ('+DEFECTS[k].d+', ещё '+P.defects[k]+' пок.)').join(', '):'';
  $('bZap').classList.toggle('hidden',!hasN('electro'));if(hasN('electro'))$('bZap').textContent=P.zapCd>0?'Разряд '+P.zapCd.toFixed(1)+'с':'Разряд (Q)';$('tZap').classList.toggle('hidden',!hasN('electro'));
- $('bDash').classList.toggle('hidden',!D.dashCd);if(D.dashCd)$('bDash').textContent=P.dashCd>0?'Рывок '+P.dashCd.toFixed(1)+'с':'Рывок (Пробел)';
+ $('bPara').classList.toggle('hidden',!hasN('parasite'));$('bPara').textContent=host?'Выйти из хозяина (R)':'Проникнуть (R)';$('bPara').classList.toggle('on',!!host);$('tPara').classList.toggle('hidden',!hasN('parasite'));$('tPara').textContent=host?'Выйти':'Внутрь'; $('bDash').classList.toggle('hidden',!D.dashCd);if(D.dashCd)$('bDash').textContent=P.dashCd>0?'Рывок '+P.dashCd.toFixed(1)+'с':'Рывок (Пробел)';
  $('bFinal').classList.toggle('hidden',D.n<GOAL_CELLS||!!P.kingdom);
- const zn=zoneName(P.x,P.y);$('obj').textContent='Объектив ×'+OBJ[cam.obj].m+' · поле ≈ '+OBJ[cam.obj].d+' мкм · '+ZONES[zn].ru;
+ const zn=zoneName(P.x,P.y);$('obj').textContent='Объектив ×'+OBJ[cam.obj].m+' · поле ≈ '+OBJ[cam.obj].d+' мкм · '+ZONES[zn].ru+' · '+(DAYK>0.9?'☀ день':DAYK<0.3?'☾ ночь':DAYK<(P.dayDir||0)?'закат':'сумерки');
  if(!P.hintsDone['zone_'+zn]&&zn!=='open'){P.hintsDone['zone_'+zn]=1;qtoast('Зона: <b>'+ZONES[zn].ru+'</b>. '+ZONES[zn].info);}
  const target=Math.min(W,H)*0.16/cam.s;const L=niceLen(target);$('sbLine').style.width=(L*cam.s)+'px';$('sbText').textContent=L+' мкм';
  $('hint').innerHTML=currentHint();checkAch();
@@ -1275,7 +1319,7 @@ function toast(html){const d=document.createElement('div');d.className='toast pa
 const ecv=$('ecv'),ectx=ecv.getContext('2d');let tool='basic',eHover=null;
 function nodeState(n){if(P.un[n.id])return'owned';if(n.rare)return'rare';for(const r of n.req){const ok=r.split('|').some(x=>P.un[x]);if(!ok)return'locked';}if(n.minCells&&D.n<n.minCells)return'locked';return'avail';}
 function unlockedTypes(){const t=['basic'];for(const n of NODES)if(n.unlock&&P.un[n.id])t.push(n.unlock);return t;}
-function toggleEditor(){if(!started||pendingMut||achOpen||setOpen)return;editorOpen=!editorOpen;$('editor').classList.toggle('hidden',!editorOpen);if(editorOpen){paused=true;renderEditor();}else{paused=false;derive();save();}}
+function toggleEditor(){if(!started||pendingMut||achOpen||setOpen)return;editorOpen=!editorOpen;$('editor').classList.toggle('hidden',!editorOpen);if(editorOpen){paused=true;restoreLost();if(host)leaveHost(false,true);renderEditor();}else{paused=false;derive();save();}}
 function renderEditor(){
  $('eBm').textContent=Math.floor(P.biomass);$('eDna').textContent=P.dna;
  let h='',grp='';
@@ -1455,7 +1499,7 @@ $('bAch').onclick=toggleAch;$('aClose').onclick=toggleAch;
 /* ========== пауза, старт ========== */
 function setPause(v,silent){paused=v;$('pause').classList.toggle('hidden',!v||!!silent||editorOpen);}
 $('bResume').onclick=()=>setPause(false);
-$('bEdit').onclick=toggleEditor;$('tEdit').onclick=toggleEditor;$('bDash').onclick=doDash;$('tDash').onclick=doDash;$('bZap').onclick=doZap;$('tZap').onclick=doZap;
+$('bPara').onclick=tryInfest;$('tPara').onclick=tryInfest;$('bEdit').onclick=toggleEditor;$('tEdit').onclick=toggleEditor;$('bDash').onclick=doDash;$('tDash').onclick=doDash;$('bZap').onclick=doZap;$('tZap').onclick=doZap;
 function begin(fresh){
  let isNew=false;if(fresh||!load()){P=newPlayer();cam.obj=0;isNew=true;}
  started=true;derive();if(isNew)P.hp=D.hpMax;setMode(P.mode||'bright');makeSpores();initWorld();cycE=null;cycT=rnd(330,420);P.inv=Math.max(P.inv,4);
